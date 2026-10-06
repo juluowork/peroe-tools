@@ -1,0 +1,243 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="tabs" id="tabs">
+		<button type="button" data-tab="lock" aria-pressed="true">{ui.tabLock}</button>
+		<button type="button" data-tab="unlock" aria-pressed="false">{ui.tabUnlock}</button>
+	</div>
+
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+	<ul class="filelist" id="list"></ul>
+
+	<!-- 加密 -->
+	<div id="panel-lock" hidden>
+		<div class="options">
+			<label class="field"><span class="lbl">{ui.userPw}</span>
+				<input id="upw" type="password" autocomplete="new-password" placeholder={ui.userPwHint} />
+			</label>
+			<label class="field"><span class="lbl">{ui.ownerPw}</span>
+				<input id="opw" type="password" autocomplete="new-password" placeholder={ui.ownerPwHint} />
+			</label>
+			<label class="field"><span class="lbl">{ui.strength}</span>
+				<select id="bits">
+					<option value="256" selected>{ui.bits256}</option>
+					<option value="128">{ui.bits128}</option>
+				</select>
+			</label>
+			<label class="field"><span class="lbl">{ui.perms}</span>
+				<select id="perms">
+					<option value="all">{ui.permAll}</option>
+					<option value="noprint">{ui.permNoPrint}</option>
+					<option value="nocopy">{ui.permNoCopy}</option>
+					<option value="none">{ui.permNone}</option>
+				</select>
+			</label>
+		</div>
+		<div class="btns">
+			<button class="btn-primary" id="lock">{ui.runLock}</button>
+			<button class="btn-link" id="reset1">{ui.startOver}</button>
+		</div>
+	</div>
+
+	<!-- 解密 -->
+	<div id="panel-unlock" hidden>
+		<div class="options">
+			<label class="field"><span class="lbl">{ui.currentPw}</span>
+				<input id="cpw" type="password" autocomplete="current-password" placeholder={ui.currentPwHint} />
+			</label>
+		</div>
+		<div class="btns">
+			<button class="btn-primary" id="unlock">{ui.runUnlock}</button>
+			<button class="btn-link" id="reset2">{ui.startOver}</button>
+		</div>
+	</div>
+
+	<p class="empty" id="status"></p>
+</div>
+
+<style>
+	.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+	.tabs button {
+		font: 500 14px/1 inherit; padding: 9px 16px; min-height: 38px; cursor: pointer;
+		border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--muted);
+	}
+	.tabs button[aria-pressed="true"] { background: var(--brand-weak); border-color: var(--brand); color: var(--brand-dark); font-weight: 600; }
+	.options { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--soft); }
+	.field { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+	.field input { font: 400 14px/1.4 inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--fg); min-width: 170px; }
+</style>
+
+<script>
+	import { bindDropZone, clearBusy, download, escapeHtml, formatBytes, opButton, renderRow, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const status = document.getElementById("status")!;
+	const panelLock = document.getElementById("panel-lock")!;
+	const panelUnlock = document.getElementById("panel-unlock")!;
+
+	let file: File | null = null;
+
+	for (const btn of document.querySelectorAll<HTMLButtonElement>("#tabs button")) {
+		btn.addEventListener("click", () => {
+			for (const b of document.querySelectorAll("#tabs button")) b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+			const lock = btn.dataset.tab === "lock";
+			panelLock.hidden = !lock;
+			panelUnlock.hidden = lock;
+			status.textContent = "";
+		});
+	}
+
+	function render() {
+		list.innerHTML = "";
+		if (!file) {
+			dz.hidden = false;
+			dz.classList.remove("is-compact");
+			panelLock.hidden = true;
+			panelUnlock.hidden = true;
+			return;
+		}
+		const li = renderRow({ name: file.name, sizeText: formatBytes(file.size) });
+		li.querySelector(".ops")!.append(
+			opButton(ui.remove, "danger", () => {
+				file = null;
+				render();
+			}),
+		);
+		list.appendChild(li);
+		dz.hidden = true;
+		const lockTab = document.querySelector('#tabs button[data-tab="lock"]') as HTMLButtonElement;
+		const isLock = lockTab.getAttribute("aria-pressed") === "true";
+		panelLock.hidden = !isLock;
+		panelUnlock.hidden = isLock;
+	}
+
+	bindDropZone(dz, fileIn, (files) => {
+		const f = files.find((x) => x.type === "application/pdf" || x.name.toLowerCase().endsWith(".pdf"));
+		if (!f) {
+			status.innerHTML = `<span class="note-warn">${ui.needPdf}</span>`;
+			return;
+		}
+		file = f;
+		status.textContent = "";
+		render();
+	});
+
+	/**
+	 * qpdf 是 emscripten 编译的命令行工具：把文件写进它的内存文件系统、跑一次 CLI、再读回来。
+	 * 它体积 1.2MB（wasm），所以**只在真正要用时才下载** —— 从 public 目录动态 import，不进打包器。
+	 */
+	/** 用 <script> 标签加载 qpdf 的 UMD 胶水（qpdf.js 是 classic script，不是 ESM）。
+	 *  这样完全绕过打包器 —— 否则 Rollup 会因为解析不了那个动态 import 而让整个构建失败。 */
+	function loadScript(src: string) {
+		return new Promise<void>((resolve, reject) => {
+			const s = document.createElement("script");
+			s.src = src;
+			s.onload = () => resolve();
+			s.onerror = () => reject(new Error("failed to load " + src));
+			document.head.appendChild(s);
+		});
+	}
+
+	interface QpdfInstance {
+		FS: { writeFile: (p: string, d: Uint8Array) => void; readFile: (p: string) => Uint8Array };
+		callMain: (args: string[]) => void;
+	}
+
+	let qpdfFactory: ((opts: Record<string, unknown>) => Promise<QpdfInstance>) | null = null;
+
+	async function loadQpdf() {
+		if (qpdfFactory) return qpdfFactory;
+		// browser.js 先造出 globalThis.exports，qpdf.js 再把 Module 挂上去（包内 qpdf.mjs 就是这么做的）
+		await loadScript("/qpdf/browser.js");
+		await loadScript("/qpdf/qpdf.js");
+		const g = globalThis as unknown as { exports?: { Module?: (o: Record<string, unknown>) => Promise<QpdfInstance> } };
+		qpdfFactory = g.exports?.Module ?? null;
+		delete g.exports;
+		if (!qpdfFactory) throw new Error(ui.qpdfFail);
+		return qpdfFactory;
+	}
+
+	async function runQpdf(args: string[], input: Uint8Array) {
+		const factory = await loadQpdf();
+		const instance = await factory({
+			locateFile: (f: string) => `/qpdf/${f}`,
+			print: () => {},
+			printErr: () => {},
+		});
+		instance.FS.writeFile("/in.pdf", input);
+		try {
+			instance.callMain(args);
+		} catch {
+			// emscripten 在 CLI 结束时用异常退出运行时，属正常
+		}
+		const out = instance.FS.readFile("/out.pdf");
+		if (!out || out.length < 100) throw new Error(ui.qpdfFail);
+		return out as Uint8Array;
+	}
+
+	async function exec(args: string[], outName: string, btn: HTMLButtonElement) {
+		if (!file) return;
+		setBusy(btn, ui.working);
+		status.textContent = ui.working;
+		try {
+			const bytes = new Uint8Array(await file.arrayBuffer());
+			const t0 = performance.now();
+			const out = await runQpdf(args, bytes);
+			download(new Blob([out as BlobPart], { type: "application/pdf" }), outName);
+			const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
+			status.innerHTML = `${ui.done} · ${kb(bytes.length)} → <b>${kb(out.length)}</b> · ${Math.round(performance.now() - t0)} ms`;
+		} catch (err) {
+			status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+		clearBusy(btn);
+	}
+
+	document.getElementById("lock")!.addEventListener("click", (e) => {
+		const upw = (document.getElementById("upw") as HTMLInputElement).value;
+		const opw = (document.getElementById("opw") as HTMLInputElement).value || upw;
+		const bits = (document.getElementById("bits") as HTMLSelectElement).value;
+		const perms = (document.getElementById("perms") as HTMLSelectElement).value;
+		if (!upw) {
+			status.innerHTML = `<span class="note-warn">${ui.needPw}</span>`;
+			return;
+		}
+		// qpdf 11+ 默认拒绝写 RC4（弱算法）。所以 128 位必须显式要求 AES，
+		// 而 40 位（只能是 RC4）干脆不提供 —— 不给用户一个「用弱加密保护文件」的按钮。
+		const args = ["--encrypt", upw, opw, bits];
+		if (bits === "128") args.push("--use-aes=y");
+		if (perms === "noprint") args.push("--print=none");
+		if (perms === "nocopy") args.push("--extract=n", "--modify=none");
+		if (perms === "none") args.push("--print=none", "--extract=n", "--modify=none", "--annotate=n");
+		args.push("--", "/in.pdf", "/out.pdf");
+		exec(args, (file?.name ?? "document").replace(/\.pdf$/i, "") + "-locked.pdf", e.currentTarget as HTMLButtonElement);
+	});
+
+	document.getElementById("unlock")!.addEventListener("click", (e) => {
+		const pw = (document.getElementById("cpw") as HTMLInputElement).value;
+		exec([`--password=${pw}`, "--decrypt", "/in.pdf", "/out.pdf"], (file?.name ?? "document").replace(/\.pdf$/i, "") + "-unlocked.pdf", e.currentTarget as HTMLButtonElement);
+	});
+
+	for (const id of ["reset1", "reset2"]) {
+		document.getElementById(id)!.addEventListener("click", () => {
+			file = null;
+			fileIn.value = "";
+			status.textContent = "";
+			render();
+		});
+	}
+</script>
