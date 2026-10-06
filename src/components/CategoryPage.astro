@@ -1,6 +1,6 @@
 ---
 import type { CategoryCopy, Locale, SiteCopy, ToolCopy } from "../i18n";
-import { categoryPath, localePath, toolPath } from "../i18n";
+import { categoryPath, localePath, toolPath, toolIcon } from "../i18n";
 import Base from "../layouts/Base.astro";
 import Icon from "./Icon.astro";
 import MoreTools from "./MoreTools.astro";
@@ -16,8 +16,6 @@ const path = `/${category.id}/`;
 const inCategory = tools.filter((t) => t.category === category.id);
 const others = tools.filter((t) => t.category !== category.id);
 const origin = "https://tools.juluo.work";
-const icon = (slug: string) =>
-	slug === "image-to-pdf" ? "pdf" : slug === "convert-image" ? "convert" : slug === "resize-image" ? "resize" : "image";
 
 const jsonLd = [
 	{
@@ -91,7 +89,7 @@ const jsonLd = [
 		<div class="grid">
 			{inCategory.map((t) => (
 				<a class="card" href={toolPath(locale, t)}>
-					<div class="ico"><Icon name={icon(t.slug)} size={32} /></div>
+					<div class="ico"><Icon name={toolIcon(t.slug)} size={32} /></div>
 					<h3>{t.nav}</h3>
 					<p>{t.blurb}</p>
 					<div class="cat">{category.name}</div>

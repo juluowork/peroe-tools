@@ -85,6 +85,14 @@ export interface SiteCopy {
 	/* ---- 导航与「全部工具」页 ---- */
 	/** 顶部「全部工具」入口 */
 	navAllTools: string;
+	/** 顶部「分类」入口 */
+	navCategories: string;
+	/** 分类索引页 */
+	categoriesPageTitle: string;
+	categoriesPageDescription: string;
+	categoriesPageH1: string;
+	categoriesPageLead: string;
+	categoriesToolsLabel: string;
 	/** 搜索框占位符 */
 	searchPlaceholder: string;
 	/** 搜索无结果 */

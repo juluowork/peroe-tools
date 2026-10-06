@@ -1,6 +1,6 @@
 ---
 import type { Locale, SiteCopy, ToolCopy } from "../i18n";
-import { categoryPath, localePath, toolPath, toolsByCategory } from "../i18n";
+import { categoryPath, localePath, toolPath, toolsByCategory, toolIcon } from "../i18n";
 import Base from "../layouts/Base.astro";
 import Icon from "./Icon.astro";
 
@@ -12,8 +12,6 @@ interface Props {
 const { locale, site, tools } = Astro.props;
 const groups = toolsByCategory(locale);
 const origin = "https://tools.juluo.work";
-const icon = (slug: string) =>
-	slug === "image-to-pdf" ? "pdf" : slug === "convert-image" ? "convert" : slug === "resize-image" ? "resize" : "image";
 
 const jsonLd = [
 	{
@@ -86,7 +84,7 @@ const jsonLd = [
 						href={toolPath(locale, t)}
 						data-search={`${t.nav} ${t.blurb} ${t.keywords.join(" ")}`.toLowerCase()}
 					>
-						<div class="ico"><Icon name={icon(t.slug)} size={32} /></div>
+						<div class="ico"><Icon name={toolIcon(t.slug)} size={32} /></div>
 						<h3>{t.nav}</h3>
 						<p>{t.blurb}</p>
 						<div class="cat">{categoryPath(locale, g.category.id) && g.category.name}</div>

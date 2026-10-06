@@ -1,0 +1,138 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div class="options" id="options" hidden>
+		<label class="field"><span class="lbl">{ui.quality} <b id="qv">70%</b></span>
+			<input id="quality" type="range" min="30" max="95" value="70" />
+		</label>
+		<label class="field"><span class="lbl">{ui.resolution}</span>
+			<select id="scale">
+				<option value="1">150 DPI</option>
+				<option value="1.5" selected>200 DPI</option>
+				<option value="2">300 DPI</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, escapeHtml, formatBytes, opButton, renderRow, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const options = document.getElementById("options")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	const quality = document.getElementById("quality") as HTMLInputElement;
+	const qv = document.getElementById("qv")!;
+	const scaleSel = document.getElementById("scale") as HTMLSelectElement;
+	let file: File | null = null;
+	quality.addEventListener("input", () => (qv.textContent = `${quality.value}%`));
+
+	bindDropZone(dz, input, async (picked) => {
+		const pdf = picked.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+		if (!pdf) return;
+		file = pdf;
+		dz.classList.add("is-compact");
+		options.hidden = false;
+		actions.hidden = false;
+		list.innerHTML = "";
+		const li = renderRow({ name: pdf.name, sizeText: formatBytes(pdf.size) });
+		li.querySelector(".ops")!.append(
+			opButton(ui.remove, "danger", () => {
+				file = null;
+				list.innerHTML = "";
+				options.hidden = true;
+				actions.hidden = true;
+				status.textContent = "";
+				dz.classList.remove("is-compact");
+			}),
+		);
+		list.appendChild(li);
+	});
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		file = null;
+		list.innerHTML = "";
+		options.hidden = true;
+		actions.hidden = true;
+		status.textContent = "";
+		dz.classList.remove("is-compact");
+	});
+
+	runBtn.addEventListener("click", async () => {
+	if (!file) return;
+	setBusy(runBtn, ui.loading);
+	status.textContent = "";
+	try {
+		const { PDFDocument } = await import("pdf-lib");
+		const { openPdf, renderPageToCanvas, canvasToBlob } = await import("../../lib/pdfjs.client");
+		const { download } = await import("../../lib/imgtools.client");
+		const open = await openPdf(await file.arrayBuffer());
+		const out = await PDFDocument.create();
+		const q = Number(quality.value) / 100;
+		const scale = Number(scaleSel.value);
+		for (let p = 1; p <= open.numPages; p++) {
+			setBusy(runBtn, `${ui.working} ${p}/${open.numPages}`);
+			const canvas = await renderPageToCanvas(open, p, scale);
+			const jpg = await canvasToBlob(canvas, "image/jpeg", q);
+			const embedded = await out.embedJpg(new Uint8Array(await jpg.arrayBuffer()));
+			const page = out.addPage([embedded.width, embedded.height]);
+			page.drawImage(embedded, { x: 0, y: 0, width: embedded.width, height: embedded.height });
+			canvas.width = canvas.height = 0;
+		}
+		const bytes = await out.save();
+		const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+		// 与压缩工具同一条原则：压完反而更大就保留原文件
+		const smaller = blob.size < file.size;
+		const finalBlob = smaller ? blob : file;
+		const li = renderRow({
+			name: smaller ? file.name.replace(/\.pdf$/i, "-compressed.pdf") : file.name,
+			sizeText: `${formatBytes(file.size)} → <b>${formatBytes(finalBlob.size)}</b>` +
+				(smaller ? ` <span class="save">${ui.saved} ${((1 - finalBlob.size / file.size) * 100).toFixed(0)}%</span>` : ""),
+		});
+		if (!smaller) {
+			const note = document.createElement("div");
+			note.className = "note-warn";
+			note.textContent = ui.notSmaller;
+			li.querySelector(".meta")!.appendChild(note);
+		}
+		li.querySelector(".ops")!.append(
+			opButton(ui.download, "primary", () =>
+				download(finalBlob, smaller ? file!.name.replace(/\.pdf$/i, "-compressed.pdf") : file!.name),
+			),
+		);
+		list.innerHTML = "";
+		list.appendChild(li);
+		status.innerHTML = `${ui.done} · ${open.numPages} ${ui.pages}`;
+	} catch (err) {
+		status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+	clearBusy(runBtn);
+});
+</script>

@@ -1,0 +1,119 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" multiple hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="add">{ui.addMore}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import {
+		bindDropZone, clearBusy, escapeHtml, formatBytes, opButton, renderRow, setBusy,
+	} from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	let files: File[] = [];
+
+	async function render() {
+		list.innerHTML = "";
+		actions.hidden = files.length === 0;
+		const { PDFDocument } = await import("pdf-lib");
+		for (let i = 0; i < files.length; i++) {
+			const file = files[i];
+			const li = renderRow({ name: `${i + 1}. ${file.name}`, sizeText: formatBytes(file.size) });
+			const ops = li.querySelector(".ops")!;
+			const up = opButton("↑", "icon", () => {
+				[files[i - 1], files[i]] = [files[i], files[i - 1]];
+				render();
+			});
+			up.disabled = i === 0;
+			const down = opButton("↓", "icon", () => {
+				[files[i + 1], files[i]] = [files[i], files[i + 1]];
+				render();
+			});
+			down.disabled = i === files.length - 1;
+			ops.append(up, down, opButton(ui.remove, "danger", () => { files.splice(i, 1); render(); }));
+			list.appendChild(li);
+			// 顺便读页数（失败就留空，不阻塞）
+			try {
+				const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+				li.querySelector(".fsize")!.innerHTML = `${formatBytes(file.size)} · <b>${doc.getPageCount()}</b> ${ui.pages}`;
+			} catch {
+				li.querySelector(".fsize")!.innerHTML = `${formatBytes(file.size)} · <span class="note-warn">${ui.unreadable}</span>`;
+			}
+		}
+	}
+
+	bindDropZone(dz, input, (picked) => {
+		files = files.concat(picked.filter((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)));
+		dz.classList.add("is-compact");
+		render();
+	});
+	document.getElementById("add")!.addEventListener("click", () => input.click());
+	document.getElementById("reset")!.addEventListener("click", () => {
+		files = [];
+		status.textContent = "";
+		dz.classList.remove("is-compact");
+		render();
+	});
+
+	runBtn.addEventListener("click", async () => {
+	setBusy(runBtn, ui.working);
+	status.textContent = "";
+	try {
+		const { PDFDocument } = await import("pdf-lib");
+		const out = await PDFDocument.create();
+		let total = 0;
+		for (const file of files) {
+			const src = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+			const copied = await out.copyPages(src, src.getPageIndices());
+			for (const p of copied) out.addPage(p);
+			total += src.getPageCount();
+		}
+		const bytes = await out.save();
+		const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+		status.innerHTML = `${ui.merged}: <b>${formatBytes(blob.size)}</b> · ${total} ${ui.pages}`;
+		const bar = document.createElement("div");
+		bar.className = "btns";
+		bar.append(
+			opButton(ui.download, "primary", () => {
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = "merged.pdf";
+				a.click();
+				setTimeout(() => URL.revokeObjectURL(url), 4000);
+			}),
+		);
+		status.appendChild(bar);
+	} catch (err) {
+		status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+	clearBusy(runBtn);
+});
+</script>

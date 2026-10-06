@@ -10,6 +10,7 @@ export const GET: APIRoute = () => {
 	const paths = [
 		"/",
 		"/tools/",
+		"/categories/",
 		...categories.map((c) => `/${c.id}/`),
 		...tools.map((t) => `/${t.category}/${t.slug}/`),
 	];

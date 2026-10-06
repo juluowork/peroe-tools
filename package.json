@@ -12,7 +12,8 @@
 	},
 	"dependencies": {
 		"astro": "^5.0.0",
-		"pdf-lib": "^1.17.1"
+		"pdf-lib": "^1.17.1",
+		"pdfjs-dist": "^6.4.299"
 	},
 	"devDependencies": {
 		"wrangler": "^4.0.0"

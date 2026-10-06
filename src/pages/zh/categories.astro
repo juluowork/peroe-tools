@@ -1,0 +1,8 @@
+---
+import CategoriesPage from "../../components/CategoriesPage.astro";
+import { getSite, getTools } from "../../i18n";
+
+const locale = "zh" as const;
+---
+
+<CategoriesPage locale={locale} site={getSite(locale)} tools={getTools(locale)} />

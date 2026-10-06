@@ -1,0 +1,150 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div class="options" id="options" hidden>
+		<label class="field"><span class="lbl">{ui.format}</span>
+			<select id="format">
+				<option value="image/png">PNG</option>
+				<option value="image/jpeg">JPG</option>
+				<option value="image/webp">WebP</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.scale}</span>
+			<select id="scale">
+				<option value="1">1x（{ui.fast}）</option>
+				<option value="1.5" selected>1.5x</option>
+				<option value="2">2x（{ui.sharp}）</option>
+				<option value="3">3x（{ui.print}）</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.quality} <b id="qv">90%</b></span>
+			<input id="quality" type="range" min="40" max="100" value="90" />
+		</label>
+	</div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, escapeHtml, formatBytes, opButton, renderRow, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const options = document.getElementById("options")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	const format = document.getElementById("format") as HTMLSelectElement;
+	const scaleSel = document.getElementById("scale") as HTMLSelectElement;
+	const quality = document.getElementById("quality") as HTMLInputElement;
+	const qv = document.getElementById("qv")!;
+	let file: File | null = null;
+	let pageCount = 0;
+	quality.addEventListener("input", () => (qv.textContent = `${quality.value}%`));
+
+	bindDropZone(dz, input, async (picked) => {
+		const pdf = picked.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+		if (!pdf) return;
+		file = pdf;
+		dz.classList.add("is-compact");
+		options.hidden = false;
+		actions.hidden = false;
+		list.innerHTML = "";
+		const li = renderRow({ name: pdf.name, sizeText: `${formatBytes(pdf.size)} · ${ui.reading}` });
+		li.querySelector(".ops")!.append(
+			opButton(ui.remove, "danger", () => {
+				file = null;
+				list.innerHTML = "";
+				options.hidden = true;
+				actions.hidden = true;
+				status.textContent = "";
+				dz.classList.remove("is-compact");
+			}),
+		);
+		list.appendChild(li);
+		try {
+			const { openPdf } = await import("../../lib/pdfjs.client");
+			const open = await openPdf(await pdf.arrayBuffer());
+			pageCount = open.numPages;
+			li.querySelector(".fsize")!.innerHTML = `${formatBytes(pdf.size)} · <b>${pageCount}</b> ${ui.pages}`;
+		} catch (err) {
+			li.querySelector(".fsize")!.innerHTML = `<span class="note-warn">${escapeHtml((err as Error).message)}</span>`;
+		}
+	});
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		file = null;
+		list.innerHTML = "";
+		options.hidden = true;
+		actions.hidden = true;
+		status.textContent = "";
+		dz.classList.remove("is-compact");
+	});
+
+	runBtn.addEventListener("click", async () => {
+	if (!file) return;
+	setBusy(runBtn, ui.loading);
+	status.textContent = "";
+	list.innerHTML = "";
+	try {
+		const { openPdf, renderPageToCanvas, canvasToBlob } = await import("../../lib/pdfjs.client");
+		const { download } = await import("../../lib/imgtools.client");
+		const open = await openPdf(await file.arrayBuffer());
+		const mime = format.value;
+		const ext = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : "png";
+		const scale = Number(scaleSel.value);
+		const q = Number(quality.value) / 100;
+		const base = (file.name || "document").replace(/\.pdf$/i, "");
+		const made: { blob: Blob; name: string }[] = [];
+		const pad = String(open.numPages).length;
+		for (let p = 1; p <= open.numPages; p++) {
+			setBusy(runBtn, `${ui.working} ${p}/${open.numPages}`);
+			const canvas = await renderPageToCanvas(open, p, scale);
+			const blob = await canvasToBlob(canvas, mime, q);
+			const name = `${base}-${String(p).padStart(pad, "0")}.${ext}`;
+			made.push({ blob, name });
+			const li = renderRow({
+				name,
+				sizeText: `${canvas.width}×${canvas.height} · ${formatBytes(blob.size)}`,
+				thumbUrl: canvas.toDataURL("image/jpeg", 0.5),
+			});
+			li.querySelector(".ops")!.append(opButton(ui.download, "primary", () => download(blob, name)));
+			list.appendChild(li);
+		}
+		status.innerHTML = `${ui.done} · ${made.length} ${ui.pages}`;
+		const bar = document.createElement("div");
+		bar.className = "btns";
+		bar.append(
+			opButton(ui.downloadAll, "primary", () => {
+				list.querySelectorAll<HTMLButtonElement>(".ops button").forEach((b, i) => setTimeout(() => b.click(), i * 300));
+			}),
+		);
+		status.appendChild(bar);
+	} catch (err) {
+		status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+	clearBusy(runBtn);
+});
+</script>

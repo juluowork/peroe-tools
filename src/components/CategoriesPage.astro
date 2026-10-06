@@ -1,0 +1,85 @@
+---
+import type { Locale, SiteCopy, ToolCopy } from "../i18n";
+import { categoryPath, localePath, toolIcon, toolPath, toolsByCategory } from "../i18n";
+import Base from "../layouts/Base.astro";
+import Icon from "./Icon.astro";
+
+interface Props {
+	locale: Locale;
+	site: SiteCopy;
+	tools: ToolCopy[];
+}
+const { locale, site, tools } = Astro.props;
+const groups = toolsByCategory(locale);
+const origin = "https://tools.juluo.work";
+
+const jsonLd = [
+	{
+		"@context": "https://schema.org",
+		"@type": "CollectionPage",
+		name: site.categoriesPageTitle,
+		url: origin + localePath(locale, "/categories/"),
+		description: site.categoriesPageDescription,
+	},
+	{
+		"@context": "https://schema.org",
+		"@type": "BreadcrumbList",
+		itemListElement: [
+			{ "@type": "ListItem", position: 1, name: site.brand, item: origin + localePath(locale, "/") },
+			{ "@type": "ListItem", position: 2, name: site.navCategories, item: origin + localePath(locale, "/categories/") },
+		],
+	},
+];
+---
+
+<Base
+	locale={locale}
+	site={site}
+	tools={tools}
+	title={site.categoriesPageTitle}
+	description={site.categoriesPageDescription}
+	path="/categories/"
+	jsonLd={jsonLd}
+>
+	<div class="tool-head">
+		<div class="crumbs">
+			<a href={localePath(locale, "/")}><Icon name="home" size={14} /></a>
+			<span>/</span><span>{site.navCategories}</span>
+		</div>
+		<h1>{site.categoriesPageH1}</h1>
+		<p class="lead">{site.categoriesPageLead}</p>
+	</div>
+
+	<div class="grid" style="margin-top:22px">
+		{groups.map((g) => (
+			<a class="card" href={categoryPath(locale, g.category.id)}>
+				<div class="ico"><Icon name={toolIcon(g.tools[0].slug)} size={32} /></div>
+				<h3>{g.category.name}</h3>
+				<p>{g.category.blurb}</p>
+				<div class="cat">{g.tools.length} {site.categoriesToolsLabel}</div>
+			</a>
+		))}
+	</div>
+
+	{groups.map((g) => (
+		<section>
+			<div class="section-head">
+				<h2><a href={categoryPath(locale, g.category.id)}>{g.category.name}</a></h2>
+				<span class="small muted">{g.category.blurb}</span>
+			</div>
+			<div class="chips">
+				{g.tools.map((t) => (
+					<a class="chip" href={toolPath(locale, t)}>{t.nav}</a>
+				))}
+			</div>
+		</section>
+	))}
+
+	<section class="prose">
+		<p>
+			{locale === "en"
+				? "More categories — developer, text and network utilities — appear here as their first tools ship. The navigation groups by category so the list stays browsable as it grows."
+				: "开发、文本、网络这几个分类会在各自第一个工具上线时出现在这里。导航按分类组织，所以工具变多之后依然好找。"}
+		</p>
+	</section>
+</Base>

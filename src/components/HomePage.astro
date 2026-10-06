@@ -1,6 +1,6 @@
 ---
 import type { Locale, SiteCopy, ToolCopy } from "../i18n";
-import { activeCategories, categoryPath, localePath, toolPath, toolsByCategory } from "../i18n";
+import { activeCategories, categoryPath, localePath, toolPath, toolsByCategory, toolIcon } from "../i18n";
 import Base from "../layouts/Base.astro";
 import Icon from "./Icon.astro";
 
@@ -85,7 +85,7 @@ const jsonLd = [
 			{tools.map((t) => (
 				<a class="card" href={toolPath(locale, t)} data-cat={categories[t.slug] ?? "Image"}>
 					<div class="ico">
-						<Icon name={t.slug === "image-to-pdf" ? "pdf" : t.slug === "convert-image" ? "convert" : t.slug === "resize-image" ? "resize" : "image"} size={32} />
+						<Icon name={toolIcon(t.slug)} size={32} />
 					</div>
 					<h3>{t.nav}</h3>
 					<p>{t.blurb}</p>

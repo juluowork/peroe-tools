@@ -5,6 +5,10 @@ import CompressTool from "../../../components/tools/CompressTool.astro";
 import ConvertTool from "../../../components/tools/ConvertTool.astro";
 import ResizeTool from "../../../components/tools/ResizeTool.astro";
 import ImageToPdfTool from "../../../components/tools/ImageToPdfTool.astro";
+import MergePdfTool from "../../../components/tools/MergePdfTool.astro";
+import SplitPdfTool from "../../../components/tools/SplitPdfTool.astro";
+import PdfToImagesTool from "../../../components/tools/PdfToImagesTool.astro";
+import CompressPdfTool from "../../../components/tools/CompressPdfTool.astro";
 import { getSite, getTools } from "../../../i18n";
 import type { ToolCopy } from "../../../i18n";
 
@@ -24,6 +28,10 @@ const components: Record<string, typeof CompressTool> = {
 	"convert-image": ConvertTool,
 	"resize-image": ResizeTool,
 	"image-to-pdf": ImageToPdfTool,
+	"merge-pdf": MergePdfTool,
+	"split-pdf": SplitPdfTool,
+	"pdf-to-images": PdfToImagesTool,
+	"compress-pdf": CompressPdfTool,
 };
 const Tool = components[tool.slug];
 ---

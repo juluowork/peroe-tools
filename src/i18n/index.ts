@@ -67,3 +67,17 @@ export function categoryPath(locale: Locale, categoryId: string): string {
 export function logicalPath(pathname: string): string {
 	return pathname.replace(/^\/zh(?=\/|$)/, "") || "/";
 }
+
+/** 工具 → 内联图标名（集中一处，新增工具只改这里） */
+const TOOL_ICONS: Record<string, string> = {
+	"compress-image": "image",
+	"convert-image": "convert",
+	"resize-image": "resize",
+	"image-to-pdf": "pdf",
+	"merge-pdf": "merge",
+	"split-pdf": "split",
+	"pdf-to-images": "images",
+	"compress-pdf": "compress",
+};
+
+export const toolIcon = (slug: string): string => TOOL_ICONS[slug] ?? "pdf";
