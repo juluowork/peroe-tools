@@ -63,7 +63,6 @@ const faqLd = {
 
 <script>
 	import { bindDropZone, formatBytes, loadImage } from "../lib/imgtools.client";
-	import { PDFDocument } from "pdf-lib";
 
 	const dz = document.getElementById("dz")!;
 	const input = document.getElementById("file") as HTMLInputElement;
@@ -123,6 +122,8 @@ const faqLd = {
 	status.textContent = "正在生成…";
 	results.after(status);
 	try {
+		// 按需加载 pdf-lib（约 400KB），只有真正点「生成 PDF」时才下载
+		const { PDFDocument } = await import("pdf-lib");
 		const pdf = await PDFDocument.create();
 		const margin = Math.max(0, Number(marginIn.value || 0));
 		const mode = sizeSel.value; // auto | a4 | letter
