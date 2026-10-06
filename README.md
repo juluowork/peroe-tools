@@ -33,6 +33,7 @@
 | **图片裁剪与旋转**（比例锁定 / 旋转翻转 / 圆形圆角） | `/image/crop-image/` | Canvas 裁剪 + `roundRect`/`ellipse` 裁剪路径 |
 | **拼长图**（纵向/横向、统一宽度、间距与背景） | `/image/stitch-image/` | 多 Canvas 合成 |
 | **九宫格切图**（3×3 / 任意行列、边框、zip 打包） | `/image/tile-image/` | Canvas 分块 + `fflate` 打包 |
+| **二维码生成与识别**（PNG/SVG、中心 logo、截图/粘贴/摄像头扫码） | `/convert/qr-code/` | `qrcode` + `jsqr`，均按需加载 |
 | **JSON 格式化**（美化 / 压缩 / 校验 / 排序） | `/dev/json-formatter/` | 原生 `JSON.parse` |
 | **Base64**（UTF-8 安全 / 文件转 Data URL） | `/dev/base64/` | `TextEncoder` + `btoa` |
 | **URL 编解码**（含查询参数解析） | `/dev/url-encode/` | `encodeURI` / `encodeURIComponent` |

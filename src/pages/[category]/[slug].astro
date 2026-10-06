@@ -18,6 +18,7 @@ import AnnotateImageTool from "../../components/tools/AnnotateImageTool.astro";
 import CropImageTool from "../../components/tools/CropImageTool.astro";
 import StitchImageTool from "../../components/tools/StitchImageTool.astro";
 import TileImageTool from "../../components/tools/TileImageTool.astro";
+import QrCodeTool from "../../components/tools/QrCodeTool.astro";
 import HeicToJpgTool from "../../components/tools/HeicToJpgTool.astro";
 import ImageToIcoTool from "../../components/tools/ImageToIcoTool.astro";
 import ExifTool from "../../components/tools/ExifTool.astro";
@@ -63,6 +64,7 @@ const components: Record<string, typeof CompressTool> = {
 	"crop-image": CropImageTool,
 	"stitch-image": StitchImageTool,
 	"tile-image": TileImageTool,
+	"qr-code": QrCodeTool,
 	"heic-to-jpg": HeicToJpgTool,
 	"image-to-ico": ImageToIcoTool,
 	"exif-viewer": ExifTool,

@@ -88,6 +88,7 @@ const TOOL_ICONS: Record<string, string> = {
 	"crop-image": "crop",
 	"stitch-image": "merge",
 	"tile-image": "pages",
+	"qr-code": "grid",
 	"image-to-ico": "image",
 	"exif-viewer": "image",
 	"heic-to-jpg": "convert",

@@ -1,0 +1,301 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="tabs" id="tabs">
+		<button type="button" data-tab="gen" aria-pressed="true">{ui.tabGen}</button>
+		<button type="button" data-tab="scan" aria-pressed="false">{ui.tabScan}</button>
+	</div>
+
+	<!-- 生成 -->
+	<div id="panel-gen">
+		<label class="fld"><span>{ui.content}</span>
+			<textarea id="text" rows="3" placeholder={ui.placeholder}></textarea>
+		</label>
+		<div class="row">
+			<label class="fld"><span>{ui.size}</span>
+				<select id="size">
+					<option value="256">256 px</option>
+					<option value="512" selected>512 px</option>
+					<option value="1024">1024 px</option>
+				</select>
+			</label>
+			<label class="fld"><span>{ui.level}</span>
+				<select id="level">
+					<option value="L">L — 7%</option>
+					<option value="M" selected>M — 15%</option>
+					<option value="Q">Q — 25%</option>
+					<option value="H">H — 30%</option>
+				</select>
+			</label>
+			<label class="fld"><span>{ui.margin} <b id="mv">2</b></span>
+				<input id="margin" type="range" min="0" max="8" value="2" />
+			</label>
+			<label class="fld"><span>{ui.fg}</span><input id="fg" type="color" value="#0f172a" /></label>
+			<label class="fld"><span>{ui.bg}</span><input id="bg" type="color" value="#ffffff" /></label>
+			<label class="fld"><span>{ui.logo}</span><input id="logo" type="file" accept="image/*" /></label>
+		</div>
+		<p class="small muted" id="logoHint" style="margin:8px 0 0">{ui.logoHint}</p>
+
+		<div class="btns">
+			<button class="btn-primary" id="make">{ui.generate}</button>
+			<button class="btn-ghost" id="dlPng" hidden>{ui.dlPng}</button>
+			<button class="btn-ghost" id="dlSvg" hidden>{ui.dlSvg}</button>
+		</div>
+		<p class="empty" id="genStatus"></p>
+		<div id="preview" hidden style="margin-top:14px;text-align:center">
+			<canvas id="cv" style="max-width:min(420px,100%);border:1px solid var(--line);border-radius:12px;background:#fff"></canvas>
+		</div>
+	</div>
+
+	<!-- 识别 -->
+	<div id="panel-scan" hidden>
+		<DropZone id="dz" title={ui.scanDrop} sub={ui.scanPaste} privacy={privacy} />
+		<input id="file" type="file" accept="image/*" hidden />
+		<div class="btns">
+			<button class="btn-ghost" id="cam">{ui.camera}</button>
+			<button class="btn-link" id="camStop" hidden>{ui.stopCamera}</button>
+		</div>
+		<video id="video" playsinline muted hidden style="margin-top:12px;max-width:min(420px,100%);border-radius:12px;border:1px solid var(--line)"></video>
+		<p class="empty" id="scanStatus"></p>
+		<div id="result" hidden>
+			<label class="fld"><span>{ui.result}</span></label>
+			<textarea id="resultText" rows="4" readonly></textarea>
+			<div class="btns">
+				<button class="btn-ghost" id="copy">{ui.copy}</button>
+				<button class="btn-ghost" id="open" hidden>{ui.openLink}</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<style>
+	.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+	.tabs button {
+		font: 500 14px/1 inherit; padding: 9px 16px; min-height: 38px; cursor: pointer;
+		border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--muted);
+	}
+	.tabs button[aria-pressed="true"] { background: var(--brand-weak); border-color: var(--brand); color: var(--brand-dark); font-weight: 600; }
+	.row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-top: 12px; }
+	.fld { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); flex: 1 1 260px; }
+	.fld > span { display: block; }
+	.fld textarea, .fld select, .fld input[type="color"] {
+		font: 400 14px/1.5 inherit; padding: 8px 10px; border: 1px solid var(--line);
+		border-radius: var(--radius-btn); background: var(--bg); color: var(--fg); width: 100%;
+	}
+	.fld input[type="color"] { padding: 2px; height: 38px; cursor: pointer; }
+	.row .fld { flex: 0 1 auto; }
+	.row .fld > span { white-space: nowrap; }
+</style>
+
+<script>
+	import { bindDropZone, download, escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const tabs = document.getElementById("tabs")!;
+	const panelGen = document.getElementById("panel-gen")!;
+	const panelScan = document.getElementById("panel-scan")!;
+	const textIn = document.getElementById("text") as HTMLTextAreaElement;
+	const cv = document.getElementById("cv") as HTMLCanvasElement;
+	const preview = document.getElementById("preview")!;
+	const genStatus = document.getElementById("genStatus")!;
+	const scanStatus = document.getElementById("scanStatus")!;
+	const result = document.getElementById("result")!;
+	const resultText = document.getElementById("resultText") as HTMLTextAreaElement;
+	const marginIn = document.getElementById("margin") as HTMLInputElement;
+	document.getElementById("mv")!.textContent = marginIn.value;
+	marginIn.addEventListener("input", () => (document.getElementById("mv")!.textContent = marginIn.value));
+
+	let logoImg: HTMLImageElement | null = null;
+	let lastText = "";
+	let svgMarkup = "";
+	let stream: MediaStream | null = null;
+	let raf = 0;
+
+	// ---------- 选项卡 ----------
+	for (const btn of tabs.querySelectorAll<HTMLButtonElement>("button")) {
+		btn.addEventListener("click", () => {
+			for (const b of tabs.querySelectorAll("button")) b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+			const gen = btn.dataset.tab === "gen";
+			panelGen.hidden = !gen;
+			panelScan.hidden = gen;
+			if (gen) stopCamera();
+		});
+	}
+
+	// ---------- 生成 ----------
+	const logoIn = document.getElementById("logo") as HTMLInputElement;
+	logoIn.addEventListener("change", async () => {
+		const f = logoIn.files?.[0];
+		if (!f) {
+			logoImg = null;
+			return;
+		}
+		const url = URL.createObjectURL(f);
+		const im = new Image();
+		im.src = url;
+		await im.decode();
+		logoImg = im;
+		// 中间放 logo 会挡掉一部分码点，纠错等级必须拉高，否则扫不出来
+		(document.getElementById("level") as HTMLSelectElement).value = "H";
+		genStatus.innerHTML = `<span class="note-warn">${ui.logoWarn}</span>`;
+	});
+
+	document.getElementById("make")!.addEventListener("click", async () => {
+		const text = textIn.value.trim();
+		if (!text) {
+			genStatus.innerHTML = `<span class="note-warn">${ui.needText}</span>`;
+			return;
+		}
+		const size = Number((document.getElementById("size") as HTMLSelectElement).value);
+		const level = (document.getElementById("level") as HTMLSelectElement).value as "L" | "M" | "Q" | "H";
+		const margin = Number(marginIn.value);
+		const fg = (document.getElementById("fg") as HTMLInputElement).value;
+		const bg = (document.getElementById("bg") as HTMLInputElement).value;
+		genStatus.textContent = ui.working;
+		try {
+			// 两个库都只在点「生成/识别」时才下载，别的页面不会被拖慢
+			const QRCode = (await import("qrcode")).default;
+			await QRCode.toCanvas(cv, text, {
+				width: size,
+				margin,
+				errorCorrectionLevel: level,
+				color: { dark: fg, light: bg },
+			});
+			if (logoImg) {
+				const g = cv.getContext("2d")!;
+				const box = Math.round(size * 0.22);
+				const x = (size - box) / 2;
+				g.fillStyle = bg;
+				g.fillRect(x - 6, x - 6, box + 12, box + 12);
+				g.drawImage(logoImg, x, x, box, box);
+			}
+			svgMarkup = await QRCode.toString(text, {
+				type: "svg",
+				margin,
+				errorCorrectionLevel: level,
+				color: { dark: fg, light: bg },
+			});
+			lastText = text;
+			preview.hidden = false;
+			document.getElementById("dlPng")!.hidden = false;
+			document.getElementById("dlSvg")!.hidden = false;
+			genStatus.innerHTML = `${ui.done} · ${size}×${size} px · ${ui.level} ${level}`;
+		} catch (err) {
+			genStatus.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+	});
+
+	document.getElementById("dlPng")!.addEventListener("click", () => {
+		cv.toBlob((b) => b && download(b, `qr-${Date.now()}.png`), "image/png");
+	});
+	document.getElementById("dlSvg")!.addEventListener("click", () => {
+		if (svgMarkup) download(new Blob([svgMarkup], { type: "image/svg+xml" }), `qr-${Date.now()}.svg`);
+	});
+
+	// ---------- 识别 ----------
+	async function decodeImage(src: HTMLImageElement | HTMLCanvasElement, w: number, h: number) {
+		const c = document.createElement("canvas");
+		// jsQR 对超大图很慢，先缩到 1000px 以内（二维码识别不需要原始分辨率）
+		const scale = Math.min(1, 1000 / Math.max(w, h));
+		c.width = Math.round(w * scale);
+		c.height = Math.round(h * scale);
+		const g = c.getContext("2d")!;
+		g.drawImage(src, 0, 0, c.width, c.height);
+		const img = g.getImageData(0, 0, c.width, c.height);
+		const jsQR = (await import("jsqr")).default;
+		return jsQR(img.data, img.width, img.height, { inversionAttempts: "attemptBoth" });
+	}
+
+	function showResult(data: string) {
+		result.hidden = false;
+		resultText.value = data;
+		const isUrl = /^https?:\/\//i.test(data);
+		document.getElementById("open")!.hidden = !isUrl;
+		scanStatus.innerHTML = `${ui.scanDone} · ${data.length} ${ui.chars}`;
+	}
+
+	async function scanFile(f: File) {
+		scanStatus.textContent = ui.scanning;
+		const bmp = await createImageBitmap(f);
+		const found = await decodeImage(bmp as unknown as HTMLImageElement, bmp.width, bmp.height);
+		bmp.close();
+		if (found) showResult(found.data);
+		else scanStatus.innerHTML = `<span class="note-warn">${ui.scanFail}</span>`;
+	}
+
+	bindDropZone(document.getElementById("dz")!, document.getElementById("file") as HTMLInputElement, (files) => {
+		const f = files.find((x) => x.type.startsWith("image/"));
+		if (f) scanFile(f);
+	});
+
+	// 直接 Ctrl+V 贴截图 —— 扫二维码最常见的动作
+	window.addEventListener("paste", async (e) => {
+		if (panelScan.hidden) return;
+		const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith("image/"));
+		const f = item?.getAsFile();
+		if (f) scanFile(f);
+	});
+
+	document.getElementById("copy")!.addEventListener("click", async () => {
+		await navigator.clipboard.writeText(resultText.value);
+		scanStatus.textContent = ui.copied;
+	});
+	document.getElementById("open")!.addEventListener("click", () => {
+		window.open(resultText.value, "_blank", "noopener");
+	});
+
+	async function stopCamera() {
+		cancelAnimationFrame(raf);
+		stream?.getTracks().forEach((t) => t.stop());
+		stream = null;
+		const v = document.getElementById("video") as HTMLVideoElement;
+		v.hidden = true;
+		document.getElementById("camStop")!.hidden = true;
+	}
+
+	document.getElementById("camStop")!.addEventListener("click", stopCamera);
+	document.getElementById("cam")!.addEventListener("click", async () => {
+		const v = document.getElementById("video") as HTMLVideoElement;
+		try {
+			stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+			v.srcObject = stream;
+			v.hidden = false;
+			await v.play();
+			document.getElementById("camStop")!.hidden = false;
+			scanStatus.textContent = ui.camHint;
+			const jsQR = (await import("jsqr")).default;
+			const tick = () => {
+				if (!stream) return;
+				if (v.readyState === v.HAVE_ENOUGH_DATA) {
+					const c = document.createElement("canvas");
+					c.width = v.videoWidth;
+					c.height = v.videoHeight;
+					const g = c.getContext("2d")!;
+					g.drawImage(v, 0, 0);
+					const img = g.getImageData(0, 0, c.width, c.height);
+					const found = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+					if (found) {
+						showResult(found.data);
+						stopCamera();
+						return;
+					}
+				}
+				raf = requestAnimationFrame(tick);
+			};
+			tick();
+		} catch (err) {
+			scanStatus.innerHTML = `<span class="note-warn">${ui.camFail}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+	});
+</script>
