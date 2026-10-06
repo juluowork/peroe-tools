@@ -1,0 +1,23 @@
+---
+import Icon from "./Icon.astro";
+
+interface Props {
+	id: string;
+	title: string;
+	sub: string;
+	privacy: string;
+	compact?: boolean;
+}
+const { id, title, sub, privacy, compact = false } = Astro.props;
+---
+
+<div class:list={["dropzone", compact && "is-compact"]} id={id}>
+	{!compact && <div class="dz-icon"><Icon name="upload" size={32} /></div>}
+	<div class="dz-title">{title}</div>
+	<div class="dz-sub">{sub}</div>
+	{!compact && (
+		<div class="dz-privacy">
+			<Icon name="shield" size={15} /> {privacy}
+		</div>
+	)}
+</div>

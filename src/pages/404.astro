@@ -1,0 +1,30 @@
+---
+import { getSite, getTools, localePath } from "../i18n";
+import Base from "../layouts/Base.astro";
+
+const locale = "en" as const;
+const site = getSite(locale);
+const tools = getTools(locale);
+---
+
+<Base
+	locale={locale}
+	site={site}
+	tools={tools}
+	title="Page not found — peroe tools"
+	description="The page you requested does not exist. Browse the free image and PDF tools instead."
+	path="/404/"
+>
+	<div class="hero">
+		<h1>Page not found</h1>
+		<p class="lead">That link may be outdated. Here is everything this site offers:</p>
+	</div>
+	<div class="grid">
+		{tools.map((t) => (
+			<a class="card" href={localePath(locale, `/${t.slug}/`)}>
+				<h3>{t.nav}</h3>
+				<p>{t.blurb}</p>
+			</a>
+		))}
+	</div>
+</Base>

@@ -1,0 +1,30 @@
+---
+import type { GetStaticPaths } from "astro";
+import ToolPage from "../../components/ToolPage.astro";
+import CompressTool from "../../components/tools/CompressTool.astro";
+import ConvertTool from "../../components/tools/ConvertTool.astro";
+import ResizeTool from "../../components/tools/ResizeTool.astro";
+import ImageToPdfTool from "../../components/tools/ImageToPdfTool.astro";
+import { getSite, getTools } from "../../i18n";
+import type { ToolCopy } from "../../i18n";
+
+const locale = "zh" as const;
+
+export const getStaticPaths = (() =>
+	getTools("zh").map((tool) => ({ params: { slug: tool.slug }, props: { tool } }))) satisfies GetStaticPaths;
+
+const { tool } = Astro.props as { tool: ToolCopy };
+const site = getSite(locale);
+const tools = getTools(locale);
+const components: Record<string, typeof CompressTool> = {
+	"compress-image": CompressTool,
+	"convert-image": ConvertTool,
+	"resize-image": ResizeTool,
+	"image-to-pdf": ImageToPdfTool,
+};
+const Tool = components[tool.slug];
+---
+
+<ToolPage locale={locale} site={site} tools={tools} tool={tool}>
+	<Tool ui={tool.ui} privacy={site.footerNote} />
+</ToolPage>

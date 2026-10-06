@@ -1,149 +1,70 @@
 ---
-import { tools } from "../lib/tools";
+import "../styles/global.css";
+import Icon from "../components/Icon.astro";
+import type { Locale, SiteCopy, ToolCopy } from "../i18n";
+import { htmlLang, localePath } from "../i18n";
 
 interface Props {
+	locale: Locale;
+	site: SiteCopy;
+	tools: ToolCopy[];
 	title: string;
 	description: string;
-	canonical?: string;
-	jsonLd?: Record<string, unknown>;
+	/** 不含语言前缀的路径，如 "/" 或 "/compress-image/" */
+	path: string;
+	jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
-
-const { title, description, canonical, jsonLd } = Astro.props;
-const site = Astro.site?.origin ?? "https://tools.juluo.work";
-const url = canonical ? new URL(canonical, site).href : new URL(Astro.url.pathname, site).href;
+const { locale, site, tools, title, description, path } = Astro.props;
+const jsonLdList = Astro.props.jsonLd ? (Array.isArray(Astro.props.jsonLd) ? Astro.props.jsonLd : [Astro.props.jsonLd]) : [];
+const origin = Astro.site?.origin ?? "https://tools.juluo.work";
+const canonical = origin + localePath(locale, path);
+const alt = origin + localePath(locale === "en" ? "zh" : "en", path);
 ---
 
 <!doctype html>
-<html lang="zh-CN">
+<html lang={htmlLang(locale)}>
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>{title}</title>
 		<meta name="description" content={description} />
-		<link rel="canonical" href={url} />
+		<link rel="canonical" href={canonical} />
+		<link rel="alternate" hreflang="en" href={origin + localePath("en", path)} />
+		<link rel="alternate" hreflang="zh-CN" href={origin + localePath("zh", path)} />
+		<link rel="alternate" hreflang="x-default" href={origin + localePath("en", path)} />
 		<meta name="robots" content="index,follow,max-image-preview:large" />
+		<meta name="theme-color" content="#00bb88" />
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={description} />
-		<meta property="og:url" content={url} />
+		<meta property="og:url" content={canonical} />
+		<meta property="og:locale" content={locale === "en" ? "en_US" : "zh_CN"} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-		{jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
-		<style is:global>
-			:root {
-				--bg: #f7f8fa;
-				--card: #fff;
-				--fg: #16181d;
-				--muted: #5c6470;
-				--line: #e3e6ec;
-				--brand: #2563eb;
-				--brand-weak: #eff4ff;
-				--ok: #15803d;
-				--radius: 12px;
-			}
-			@media (prefers-color-scheme: dark) {
-				:root {
-					--bg: #101216;
-					--card: #171a20;
-					--fg: #e8eaee;
-					--muted: #9aa3b2;
-					--line: #262b34;
-					--brand: #6ea8ff;
-					--brand-weak: #16233c;
-				}
-			}
-			* { box-sizing: border-box; }
-			html { -webkit-text-size-adjust: 100%; }
-			body {
-				margin: 0;
-				background: var(--bg);
-				color: var(--fg);
-				font: 15px/1.7 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-			}
-			a { color: var(--brand); text-decoration: none; }
-			a:hover { text-decoration: underline; }
-			.wrap { max-width: 920px; margin: 0 auto; padding: 0 18px; }
-			header.site { border-bottom: 1px solid var(--line); background: var(--card); }
-			header.site .wrap { display: flex; align-items: center; gap: 18px; height: 56px; }
-			header.site .logo { font-weight: 700; color: var(--fg); }
-			header.site nav { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; }
-			header.site nav a { color: var(--muted); }
-			main { padding: 26px 0 60px; }
-			h1 { font-size: 26px; line-height: 1.35; margin: 6px 0 10px; }
-			h2 { font-size: 19px; margin: 30px 0 10px; }
-			h3 { font-size: 16px; margin: 20px 0 8px; }
-			p.lead { color: var(--muted); margin: 0 0 18px; }
-			.card {
-				background: var(--card);
-				border: 1px solid var(--line);
-				border-radius: var(--radius);
-				padding: 18px;
-				margin: 16px 0;
-			}
-			.dropzone {
-				border: 2px dashed var(--line);
-				border-radius: var(--radius);
-				padding: 30px 16px;
-				text-align: center;
-				color: var(--muted);
-				cursor: pointer;
-				transition: .15s;
-			}
-			.dropzone--over { border-color: var(--brand); background: var(--brand-weak); }
-			.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 14px 0; }
-			label.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); }
-			input[type=number], input[type=text], select {
-				padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
-				background: var(--bg); color: var(--fg); font: inherit; min-width: 120px;
-			}
-			input[type=range] { width: 190px; }
-			button {
-				padding: 9px 16px; border: 1px solid var(--brand); border-radius: 8px;
-				background: var(--brand); color: #fff; font: inherit; cursor: pointer;
-			}
-			button.ghost { background: transparent; color: var(--brand); }
-			button:disabled { opacity: .5; cursor: not-allowed; }
-			ul.results { list-style: none; margin: 10px 0 0; padding: 0; }
-			ul.results li {
-				display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-				padding: 10px 0; border-top: 1px solid var(--line);
-			}
-			ul.results img.thumb { width: 54px; height: 54px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
-			.name { flex: 1 1 180px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-			.size { color: var(--muted); font-size: 13px; }
-			.size .save { color: var(--ok); }
-			.tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-			.tools-grid a.card { display: block; color: inherit; }
-			.tools-grid a.card:hover { border-color: var(--brand); text-decoration: none; }
-			.tools-grid .card h2 { margin: 0 0 6px; font-size: 17px; }
-			.tools-grid .card p { margin: 0; color: var(--muted); font-size: 14px; }
-			.hint { font-size: 13px; color: var(--muted); }
-			details.faq { border-top: 1px solid var(--line); padding: 12px 0; }
-			.badge {
-				display: inline-block; font-size: 12px; padding: 3px 9px; border-radius: 999px;
-				background: var(--brand-weak); color: var(--brand); margin-bottom: 8px;
-			}
-			/* 广告位：拿到 AdSense 发布商 ID 后把 AdSense 代码放进 .ad-slot 里即可 */
-			.ad-slot { min-height: 0; margin: 22px 0; text-align: center; }
-			footer.site { border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; padding: 22px 0; }
-			footer.site .wrap { display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
-		</style>
+		{jsonLdList.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
 	</head>
 	<body>
-		<header class="site">
+		<header class="site-header">
 			<div class="wrap">
-				<a class="logo" href="/">peroe 工具箱</a>
-				<nav>
-					{tools.map((t) => <a href={`/${t.slug}/`}>{t.short}</a>)}
+				<a class="brand" href={localePath(locale, "/")}>
+					<span class="dot"></span>{site.brand}
+				</a>
+				<nav class="site-nav" aria-label={site.navLabel}>
+					{tools.map((t) => <a href={localePath(locale, `/${t.slug}/`)}>{t.nav}</a>)}
 				</nav>
+				<a class="lang-switch" href={localePath(locale === "en" ? "zh" : "en", path)}>{site.switchLabel}</a>
 			</div>
 		</header>
-		<main class="wrap">
-			<slot />
-		</main>
-		<footer class="site">
+		<main>
 			<div class="wrap">
-				<span>所有工具均在你的浏览器本地运行，文件不会上传到服务器。</span>
-				<span><a href="https://blog.peroe.cn/">博客</a></span>
+				<slot />
+			</div>
+		</main>
+		<footer class="site-footer">
+			<div class="wrap">
+				<span>{site.footerNote}</span>
+				<span>
+					{site.footerLinks.map((l) => <a href={l.href}>{l.label}</a>)}
+				</span>
 			</div>
 		</footer>
 	</body>

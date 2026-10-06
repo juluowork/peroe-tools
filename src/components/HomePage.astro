@@ -1,0 +1,117 @@
+---
+import type { Locale, SiteCopy, ToolCopy } from "../i18n";
+import { localePath } from "../i18n";
+import Base from "../layouts/Base.astro";
+import Icon from "./Icon.astro";
+
+interface Props {
+	locale: Locale;
+	site: SiteCopy;
+	tools: ToolCopy[];
+}
+const { locale, site, tools } = Astro.props;
+const origin = "https://tools.juluo.work";
+const categories: Record<string, string> = {
+	"compress-image": "Image",
+	"convert-image": "Image",
+	"resize-image": "Image",
+	"image-to-pdf": "PDF",
+};
+const cats = locale === "en"
+	? [["all", "All"], ["Image", "Image"], ["PDF", "PDF"]]
+	: [["all", "全部"], ["Image", "图片"], ["PDF", "PDF"]];
+
+const jsonLd = [
+	{
+		"@context": "https://schema.org",
+		"@type": "WebSite",
+		name: site.brand,
+		url: origin + localePath(locale, "/"),
+		description: site.homeDescription,
+	},
+	{
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		mainEntity: site.homeFaq.map((f) => ({
+			"@type": "Question",
+			name: f.q,
+			aacceptedAnswer: { "@type": "Answer", text: f.a },
+		})),
+	},
+];
+---
+
+<Base
+	locale={locale}
+	site={site}
+	tools={tools}
+	title={site.homeTitle}
+	description={site.homeDescription}
+	path="/"
+	jsonLd={jsonLd}
+>
+	<div class="hero">
+		<h1>{site.homeH1}</h1>
+		<p class="lead">{site.homeLead}</p>
+	</div>
+
+	<div class="badges">
+		{site.badges.map((b, i) => (
+			<div><Icon name={i === 1 ? "upload" : i === 2 ? "check" : i === 3 ? "zap" : "shield"} size={18} /> {b}</div>
+		))}
+	</div>
+
+	<section>
+		<div class="section-head"><h2>{site.toolsTitle}</h2></div>
+		<div class="tabs" id="tabs">
+			{cats.map(([value, label], i) => (
+				<button type="button" data-cat={value} aria-pressed={i === 0 ? "true" : "false"}>{label}</button>
+			))}
+		</div>
+		<div class="grid" id="toolgrid">
+			{tools.map((t) => (
+				<a class="card" href={localePath(locale, `/${t.slug}/`)} data-cat={categories[t.slug] ?? "Image"}>
+					<div class="ico">
+						<Icon name={t.slug === "image-to-pdf" ? "pdf" : t.slug === "convert-image" ? "convert" : t.slug === "resize-image" ? "resize" : "image"} size={32} />
+					</div>
+					<h3>{t.nav}</h3>
+					<p>{t.blurb}</p>
+					<div class="cat">{categories[t.slug]}</div>
+				</a>
+			))}
+		</div>
+	</section>
+
+	<section class="prose">
+		<h2>{site.homeWhyTitle}</h2>
+		{site.homeWhy.map((p) => <p>{p}</p>)}
+	</section>
+
+	<div class="ad-slot" data-ad-slot="home-mid"></div>
+
+	<section>
+		<h2>{site.faqTitle}</h2>
+		{site.homeFaq.map((f) => (
+			<details class="faq"><summary>{f.q}</summary><p>{f.a}</p></details>
+		))}
+	</section>
+</Base>
+
+<script>
+	const tabs = document.getElementById("tabs");
+	const grid = document.getElementById("toolgrid");
+	if (tabs && grid) {
+		const cards = [...grid.querySelectorAll<HTMLAnchorElement>(".card")];
+		tabs.addEventListener("click", (e) => {
+			const btn = (e.target as HTMLElement).closest("button");
+			if (!btn) return;
+			const cat = btn.dataset.cat ?? "all";
+			for (const b of tabs.querySelectorAll("button")) {
+				b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+			}
+			for (const c of cards) {
+				c.style.display = cat === "all" || c.dataset.cat === cat ? "" : "none";
+			}
+		});
+	}
+</script>

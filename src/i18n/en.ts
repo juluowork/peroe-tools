@@ -1,0 +1,296 @@
+import type { SiteCopy, ToolCopy } from "./types";
+
+const privacy = "Processed in your browser — your files are never uploaded.";
+const uiCommon = {
+	selectFiles: "Select files",
+	orDrop: "or drop them here",
+	startOver: "Start over",
+	addMore: "Add more files",
+	download: "Download",
+	downloadAll: "Download all",
+	working: "Working…",
+	remove: "Remove",
+};
+
+export const site: SiteCopy = {
+	lang: "en",
+	brand: "peroe tools",
+	tagline: "Private image & PDF tools that run in your browser",
+	homeTitle: "Free Online Image & PDF Tools — No Upload, No Sign-up",
+	homeDescription:
+		"Compress, convert, resize images and turn photos into PDF right in your browser. Your files never leave your device: no uploads, no accounts, no watermarks, no limits.",
+	homeH1: "Image & PDF tools that never upload your files",
+	homeLead:
+		"Every tool on this site runs inside your browser. Pick a file, get your result — nothing is sent to a server, nothing is stored, and it still works offline.",
+	homeWhyTitle: "Why local processing matters",
+	homeWhy: [
+		"Most online converters ask you to upload your file first. That is fine for a meme, but a contract, a passport scan, a medical report or an unreleased design is a different story — once uploaded, you no longer control where it lives or how long it is kept.",
+		"These tools take the other path: the encoding happens in your browser using Canvas and WebAssembly, so your file only ever exists in your device memory and disappears when you close the tab. That is not a promise in a privacy policy — it is a property of the architecture. This site has no endpoint that accepts uploads.",
+	],
+	homeFaq: [
+		{
+			q: "Is it really processed locally?",
+			a: "Yes. The pages contain no upload code; compression and conversion run through browser APIs. You can verify it yourself in DevTools: open the Network panel and confirm there is no request carrying your file.",
+		},
+		{
+			q: "Are there limits on file size or number of files?",
+			a: "No artificial limits. The only ceiling is your device memory — a few hundred megabytes of images is usually fine. For very large batches, work in groups of 20-30 files.",
+		},
+		{
+			q: "Does it work on mobile and offline?",
+			a: "Both. The layout adapts to phones, and since all processing is local, the tools keep working with no network connection once the page has loaded.",
+		},
+		{
+			q: "Do you add watermarks or require an account?",
+			a: "Never. There is no sign-up, no watermark, no file count limit and no paid tier hiding behind the button.",
+		},
+	],
+	howTitle: "How it works",
+	stepsTitle: "How to use it",
+	faqTitle: "Frequently asked questions",
+	toolsTitle: "All tools",
+	navLabel: "Tools",
+	switchLabel: "中文",
+	switchHref: "/zh/",
+	badges: ["100% local", "No upload", "No sign-up", "Works offline"],
+	footerNote: "Files are processed on your device and never uploaded.",
+	footerLinks: [{ label: "Blog", href: "https://blog.peroe.cn/" }],
+	privacyLine: "No cookies, no tracking pixels, no accounts.",
+};
+
+export const tools: ToolCopy[] = [
+	{
+		slug: "compress-image",
+		icon: "M4 4h16v16H4z M9 13l2.5-3 2 2.5L16 9l3 5z",
+		accent: "#2563eb",
+		nav: "Compress",
+		h1: "Compress images without uploading them",
+		metaTitle: "Compress JPG, PNG & WebP Images Online — Free, No Upload",
+		metaDescription:
+			"Free image compressor that runs in your browser: shrink JPG, PNG and WebP files, set a target size, batch process and download. Files are never uploaded.",
+		blurb: "Shrink JPG / PNG / WebP by up to 80%, batch friendly",
+		lead: "Reduce file size with a quality slider or a target size in KB. Everything happens on your device, so even private photos never leave it.",
+		steps: [
+			"Drop in one or many images (JPG, PNG, WebP or anything your browser can decode).",
+			"Pick an output format and a quality level — or type a target size in KB.",
+			"Compare before/after sizes and download the ones you want. Nothing is queued on a server.",
+		],
+		notes: [
+			{
+				title: "What each setting does",
+				body: "Quality controls the encoder: 80% is usually visually identical to the original while cutting 40-60% of the bytes. A target size keeps re-encoding at lower quality until the file fits (up to 5 attempts), which is handy for upload forms with hard limits.",
+			},
+			{
+				title: "Choosing the right format",
+				body: "WebP wins for photos and screenshots with transparency; JPG is the most compatible but has no alpha channel; PNG stays lossless and is best for flat graphics, icons and line art.",
+			},
+			{
+				title: "If the result gets bigger",
+				body: "Re-encoding an already optimised PNG can produce a larger file — lossless compression has nothing left to squeeze. When that happens this tool keeps your original and tells you, instead of handing you a worse file.",
+			},
+		],
+		faq: [
+			{
+				q: "Are my images uploaded anywhere?",
+				a: "No. Compression runs in your browser with Canvas, so the image stays in local memory. There is no upload endpoint in the page at all, and it works with the network disconnected.",
+			},
+			{
+				q: "How much smaller will my files get?",
+				a: "Photos typically shrink 40-70% at 80% quality, and up to 80% when you also switch to WebP. PNG screenshots with few colours can shrink even more; already-optimised PNGs may not shrink at all.",
+			},
+			{
+				q: "Can I compress many images at once?",
+				a: "Yes — select or drop as many as you like. Each file is processed independently and shows its own before/after size with a download button.",
+			},
+			{
+				q: "Will metadata such as EXIF be kept?",
+				a: "No. Re-encoding through Canvas drops EXIF data, including GPS coordinates. That is usually what you want for images you publish, but keep the original if the metadata matters.",
+			},
+		],
+		ui: {
+			...uiCommon,
+			dropzone: "Drop images here, or click to choose",
+			format: "Output format",
+			formatKeep: "Keep original",
+			formatWebp: "WebP (smallest)",
+			formatJpg: "JPG",
+			formatPng: "PNG (lossless)",
+			quality: "Quality",
+			targetSize: "Target size (KB, optional)",
+			run: "Compress images",
+			notSmaller: "already optimal, original kept",
+			saved: "saved",
+			failed: "Failed",
+		},
+	},
+	{
+		slug: "convert-image",
+		icon: "M4 7h7v10H4z M13 7h7v10h-7z M11 12h2",
+		accent: "#7c3aed",
+		nav: "Convert",
+		h1: "Convert images between JPG, PNG, WebP and AVIF",
+		metaTitle: "Image Converter — JPG, PNG, WebP & AVIF, Runs Offline",
+		metaDescription:
+			"Convert images to JPG, PNG, WebP or AVIF in your browser. Keep or flatten transparency, choose quality, batch convert — no upload, no registration.",
+		blurb: "JPG / PNG / WebP / AVIF conversion with alpha handling",
+		lead: "Switch formats without sending anything to a server. Transparency handling and quality are under your control.",
+		steps: [
+			"Add the images you want to convert.",
+			"Choose the target format — and a background colour if you are flattening transparency into JPG.",
+			"Convert and download. Files that were never uploadable in the first place stay private.",
+		],
+		notes: [
+			{
+				title: "Which format should you pick?",
+				body: "WebP is the best default: 25-35% smaller than JPG at the same visual quality, with alpha support. Use JPG only when a legacy tool demands it. Keep PNG for icons and screenshots. AVIF compresses best of all, but encoding is slower and very old software cannot open it.",
+			},
+			{
+				title: "Transparency rules",
+				body: "PNG, WebP and AVIF can hold an alpha channel; JPG cannot. Converting a transparent PNG to JPG fills the empty area with the background colour you choose (white by default), so pick a colour that matches where the image will be placed.",
+			},
+		],
+		faq: [
+			{
+				q: "Does converting to WebP lose quality?",
+				a: "At 88% and above the difference is invisible in practice, while the file gets noticeably smaller. If you need a mathematically lossless file, stay on PNG.",
+			},
+			{
+				q: "My transparent PNG turned black in JPG — why?",
+				a: "JPG has no alpha channel, so transparent pixels have to become some colour. Set the background colour option to white (or any colour) before converting and the result will look right.",
+			},
+			{
+				q: "Can it convert HEIC photos from an iPhone?",
+				a: "Safari on iOS can decode HEIC, so conversion works there. Most desktop browsers cannot decode HEIC yet — if the format is unsupported, export as JPG from Photos first.",
+			},
+		],
+		ui: {
+			...uiCommon,
+			dropzone: "Drop images here, or click to choose",
+			target: "Convert to",
+			background: "Background for transparency",
+			bgKeep: "Keep transparent (PNG/WebP)",
+			bgWhite: "White",
+			bgBlack: "Black",
+			quality: "Quality",
+			run: "Convert images",
+			avifOk: "Your browser can encode AVIF.",
+			avifNo: "Your browser cannot encode AVIF — use WebP instead (similar size).",
+			failed: "Failed",
+		},
+	},
+	{
+		slug: "resize-image",
+		icon: "M4 4h9v9H4z M11 11h9v9h-9z",
+		accent: "#0891b2",
+		nav: "Resize",
+		h1: "Resize images by pixels or percentage",
+		metaTitle: "Resize Image Online — Change Dimensions, Keep Aspect Ratio",
+		metaDescription:
+			"Resize photos and screenshots by width, height or percentage while keeping the aspect ratio. Batch resize and download — processed locally, never uploaded.",
+		blurb: "Set width, height or a percentage; ratio stays locked",
+		lead: "Make images fit a form, a layout or a social profile. Enter one dimension and the other follows the original ratio.",
+		steps: [
+			"Add the images you want to resize.",
+			"Enter a width, a height, or a percentage — leave the rest to the ratio lock.",
+			"Resize and download. For batches, fill in a single dimension so each image keeps its own proportions.",
+		],
+		notes: [
+			{
+				title: "Downscaling is where the wins are",
+				body: "A 4000px camera photo displayed at 1600px wastes roughly 6× the bytes. Resizing to the size you actually display, then compressing, usually beats compression alone.",
+			},
+			{
+				title: "Upscaling does not add detail",
+				body: "Enlarging just stretches existing pixels, so edges soften. If you truly need a larger image, use a dedicated AI upscaler instead of this tool.",
+			},
+		],
+		faq: [
+			{
+				q: "Will my image be stretched?",
+				a: "Only if you switch the ratio lock off and give both a width and a height. With the lock on (the default), the second dimension is calculated from the original proportions.",
+			},
+			{
+				q: "How does batch resizing decide each size?",
+				a: "The rule you type is applied to every file. Fill in width only and each image is scaled to that width with its own height; the same logic applies if you only fill in height.",
+			},
+			{
+				q: "Does resizing also compress the file?",
+				a: "Yes, indirectly — fewer pixels means fewer bytes. For the smallest possible result, resize first and then run the image through the compressor.",
+			},
+		],
+		ui: {
+			...uiCommon,
+			dropzone: "Drop images here, or click to choose",
+			width: "Width (px)",
+			height: "Height (px)",
+			percent: "Or scale by (%)",
+			lock: "Keep aspect ratio",
+			lockYes: "Yes (recommended)",
+			lockNo: "No (may distort)",
+			run: "Resize images",
+			needValue: "Enter a width, a height or a percentage first.",
+			failed: "Failed",
+		},
+	},
+	{
+		slug: "image-to-pdf",
+		icon: "M6 3h8l4 4v14H6z M14 3v5h5",
+		accent: "#dc2626",
+		nav: "To PDF",
+		h1: "Turn images into a PDF — without uploading them",
+		metaTitle: "Image to PDF Converter — Combine Photos Locally, No Upload",
+		metaDescription:
+			"Combine JPG, PNG or WebP images into a single PDF in your browser. Reorder pages, choose A4, Letter or image-sized pages, add margins — nothing is uploaded.",
+		blurb: "Merge photos, scans or receipts into one ordered PDF",
+		lead: "Build a PDF from photos, scans or receipts. Because the file is assembled locally, this is safe for ID documents, contracts and invoices.",
+		steps: [
+			"Add the images — the list order becomes the page order, and you can move or remove any page.",
+			"Choose a page size (image-sized avoids white borders on mixed portrait/landscape sets).",
+			"Generate the PDF and download it. Nothing was sent anywhere.",
+		],
+		notes: [
+			{
+				title: "Image-sized pages vs A4",
+				body: "Image-sized pages make each page exactly as large as its image, so there are no margins. A4 or Letter is what you want when the PDF will be printed or mixed with other documents, but portrait scans on a landscape page will leave space.",
+			},
+			{
+				title: "Good source images matter",
+				body: "PDF pages here embed the original pixels, so scan at 200-300 DPI for text you need to read. Compressing images before converting keeps the final PDF small — you can do that with the compressor on this site.",
+			},
+		],
+		faq: [
+			{
+				q: "Is it safe to convert a passport or contract here?",
+				a: "Yes — that is exactly why this tool exists. Images and the generated PDF exist only in your browser memory; the page has no upload endpoint, and it works with the network switched off.",
+			},
+			{
+				q: "Can I control the page order?",
+				a: "Yes. Every item in the list has up/down buttons, and the order you see is the order of the pages in the PDF.",
+			},
+			{
+				q: "What image formats can I use?",
+				a: "JPG and PNG are embedded directly. WebP, AVIF, GIF and anything else your browser can decode is converted to PNG on the fly, then embedded.",
+			},
+			{
+				q: "Is there a page limit?",
+				a: "The practical limit is your device memory. A few hundred pages of phone photos is usually fine; generate in batches if a document gets very large.",
+			},
+		],
+		ui: {
+			...uiCommon,
+			dropzone: "Drop images here (first file = first page)",
+			pageSize: "Page size",
+			sizeAuto: "Match each image",
+			sizeA4: "A4",
+			sizeLetter: "Letter",
+			margin: "Margin (pt)",
+			filename: "File name",
+			run: "Create PDF",
+			generating: "Generating PDF…",
+			generated: "PDF ready",
+			pages: "pages",
+			page: "Page",
+			failed: "Failed",
+		},
+	},
+];

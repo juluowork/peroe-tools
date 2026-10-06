@@ -1,0 +1,19 @@
+---
+import type { Locale, ToolCopy } from "../i18n";
+import ToolCard from "./ToolCard.astro";
+import { getSite } from "../i18n";
+
+interface Props {
+	locale: Locale;
+	tools: ToolCopy[];
+}
+const { locale, tools } = Astro.props;
+const site = getSite(locale);
+---
+
+<section>
+	<div class="section-head"><h2>{site.toolsTitle}</h2></div>
+	<div class="grid">
+		{tools.map((t) => <ToolCard tool={t} locale={locale} />)}
+	</div>
+</section>

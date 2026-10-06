@@ -1,0 +1,100 @@
+---
+import type { Locale, SiteCopy, ToolCopy } from "../i18n";
+import { localePath } from "../i18n";
+import Base from "../layouts/Base.astro";
+import Icon from "./Icon.astro";
+import MoreTools from "./MoreTools.astro";
+
+interface Props {
+	locale: Locale;
+	site: SiteCopy;
+	tools: ToolCopy[];
+	tool: ToolCopy;
+}
+const { locale, site, tools, tool } = Astro.props;
+const path = `/${tool.slug}/`;
+const others = tools.filter((t) => t.slug !== tool.slug);
+const origin = "https://tools.juluo.work";
+
+const jsonLd = [
+	{
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		mainEntity: tool.faq.map((f) => ({
+			"@type": "Question",
+			name: f.q,
+			aacceptedAnswer: { "@type": "Answer", text: f.a },
+		})),
+	},
+	{
+		"@context": "https://schema.org",
+		"@type": "SoftwareApplication",
+		name: tool.metaTitle,
+		applicationCategory: "MultimediaApplication",
+		operatingSystem: "Any (web browser)",
+		offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+		url: origin + localePath(locale, path),
+	},
+	{
+		"@context": "https://schema.org",
+		"@type": "BreadcrumbList",
+		itemListElement: [
+			{ "@type": "ListItem", position: 1, name: site.brand, item: origin + localePath(locale, "/") },
+			{ "@type": "ListItem", position: 2, name: tool.nav, item: origin + localePath(locale, path) },
+		],
+	},
+];
+---
+
+<Base
+	locale={locale}
+	site={site}
+	tools={tools}
+	title={tool.metaTitle}
+	description={tool.metaDescription}
+	path={path}
+	jsonLd={jsonLd}
+>
+	<div class="tool-head">
+		<div class="crumbs">
+			<a href={localePath(locale, "/")}><Icon name="home" size={14} /></a>
+			<span>/</span>
+			<span>{tool.nav}</span>
+		</div>
+		<h1>{tool.h1}</h1>
+		<p class="lead">{tool.lead}</p>
+		<span class="pill"><Icon name="lock" size={14} /> {site.footerNote}</span>
+	</div>
+
+	<div style="margin-top:22px">
+		<slot />
+	</div>
+
+	<div class="ad-slot" data-ad-slot="tool-mid"></div>
+
+	<section>
+		<h2>{site.stepsTitle}</h2>
+		<ol class="steps">
+			{tool.steps.map((s) => <li>{s}</li>)}
+		</ol>
+	</section>
+
+	<section class="prose">
+		<h2>{site.howTitle}</h2>
+		{tool.notes.map((n) => (
+			<>
+				<h3>{n.title}</h3>
+				<p set:html={n.body.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")} />
+			</>
+		))}
+	</section>
+
+	<section>
+		<h2>{site.faqTitle}</h2>
+		{tool.faq.map((f) => (
+			<details class="faq"><summary>{f.q}</summary><p>{f.a}</p></details>
+		))}
+	</section>
+
+	<MoreTools locale={locale} tools={others} />
+</Base>

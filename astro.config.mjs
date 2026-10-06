@@ -1,10 +1,16 @@
 import { defineConfig } from "astro/config";
 
-// 站点主域：海外向工具站，挂在不备案的 juluo.work 下（可放 AdSense）
+const toolSlugs = ["compress-image", "convert-image", "resize-image", "image-to-pdf"];
+// 英文版在根路径（/compress-image/），中文版在 /zh/compress-image/。
+// 早期版本曾把英文版放在 /en/ 下，这里保留 301 别名，避免旧链接失效。
+const redirects = { "/en": "/" };
+for (const slug of toolSlugs) redirects[`/en/${slug}`] = `/${slug}/`;
+
 export default defineConfig({
 	site: "https://tools.juluo.work",
 	output: "static",
 	trailingSlash: "always",
 	build: { format: "directory" },
 	devToolbar: { enabled: false },
+	redirects,
 });

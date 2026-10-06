@@ -125,3 +125,56 @@ export function bindDropZone(zone: HTMLElement, input: HTMLInputElement, onFiles
 		if (dt?.files?.length) onFiles([...dt.files]);
 	});
 }
+
+
+/** 统一的文件行：缩略图 + 文件名 + 尺寸/结果 + 操作按钮容器 */
+export interface RowParts {
+	name: string;
+	sizeText: string;
+	thumbUrl?: string;
+	note?: string;
+	noteKind?: "ok" | "warn";
+}
+
+export function renderRow(parts: RowParts): HTMLLIElement {
+	const li = document.createElement("li");
+	const thumb = parts.thumbUrl
+		? `<img class="thumb" src="${parts.thumbUrl}" alt="" />`
+		: '<div class="thumb"></div>';
+	li.innerHTML = `${thumb}
+		<div class="meta">
+			<div class="fname">${escapeHtml(parts.name)}</div>
+			<div class="fsize">${parts.sizeText}</div>
+			${parts.note ? `<div class="${parts.noteKind === "warn" ? "note-warn" : "note-ok"}">${escapeHtml(parts.note)}</div>` : ""}
+		</div>
+		<div class="ops"></div>`;
+	return li;
+}
+
+export function opButton(
+	label: string,
+	kind: "primary" | "icon" | "danger" = "primary",
+	onClick?: () => void,
+): HTMLButtonElement {
+	const b = document.createElement("button");
+	b.textContent = label;
+	b.className = kind === "primary" ? "btn-primary" : kind === "danger" ? "btn-icon danger" : "btn-icon";
+	if (onClick) b.addEventListener("click", onClick);
+	return b;
+}
+
+export function escapeHtml(s: string): string {
+	return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+}
+
+/** 主按钮忙碌态：内嵌 spinner + 进度文案（本地处理很快，不放大进度条） */
+export function setBusy(btn: HTMLButtonElement, text: string): void {
+	if (!btn.dataset.idle) btn.dataset.idle = btn.textContent ?? "";
+	btn.disabled = true;
+	btn.innerHTML = `<span class="spinner"></span><span>${escapeHtml(text)}</span>`;
+}
+
+export function clearBusy(btn: HTMLButtonElement): void {
+	btn.disabled = false;
+	if (btn.dataset.idle) btn.textContent = btn.dataset.idle;
+}
