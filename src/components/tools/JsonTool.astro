@@ -1,0 +1,180 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="iogrid">
+		<div>
+			<span class="label">{ui.input}</span>
+			<textarea id="input" placeholder='{"hello": "world"}' spellcheck="false"></textarea>
+		</div>
+		<div>
+			<span class="label">{ui.output}</span>
+			<textarea id="output" class="outbox" readonly spellcheck="false"></textarea>
+		</div>
+	</div>
+
+	<div class="options" style="margin-top:14px">
+		<label class="field"><span class="lbl">{ui.indent}</span>
+			<select id="indent">
+				<option value="2">2 {ui.spaces}</option>
+				<option value="4">4 {ui.spaces}</option>
+				<option value="tab">{ui.tab}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.sortKeys}</span>
+			<select id="sort">
+				<option value="0">{ui.off}</option>
+				<option value="1">{ui.on}</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="btns">
+		<button class="btn-primary" id="format">{ui.format}</button>
+		<button class="btn-ghost" id="minify">{ui.minify}</button>
+		<button class="btn-ghost" id="validate">{ui.validate}</button>
+		<button class="btn-ghost" id="escape">{ui.escape}</button>
+		<button class="btn-ghost" id="unescape">{ui.unescape}</button>
+		<button class="btn-ghost" id="copy">{ui.copy}</button>
+		<button class="btn-ghost" id="save">{ui.save}</button>
+		<button class="btn-link" id="clear">{ui.clear}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<style>
+	:global(.iogrid) { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; align-items: start; }
+	@media (max-width: 820px) { :global(.iogrid) { grid-template-columns: 1fr; } }
+	:global(.iogrid textarea) {
+		width: 100%; min-height: 260px; padding: 12px 14px; font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+		border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--bg); color: var(--fg); resize: vertical;
+	}
+	:global(.iogrid textarea:focus) { outline: 2px solid var(--brand-weak); border-color: var(--brand); }
+	:global(.iogrid .label) { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+	:global(.outbox) { background: var(--soft) !important; }
+</style>
+
+<script>
+	import { bindCopy, downloadText, formatCount } from "../../lib/devtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const input = document.getElementById("input") as HTMLTextAreaElement;
+	const output = document.getElementById("output") as HTMLTextAreaElement;
+	const status = document.getElementById("status")!;
+	const indentSel = document.getElementById("indent") as HTMLSelectElement;
+	const sortSel = document.getElementById("sort") as HTMLSelectElement;
+
+	function indentOf(): string | number {
+		return indentSel.value === "tab" ? "\t" : Number(indentSel.value);
+}
+
+	/** 按键名排序（递归，数组保持原序） */
+	function sortDeep(value: unknown): unknown {
+		if (Array.isArray(value)) return value.map(sortDeep);
+		if (value && typeof value === "object") {
+			const out: Record<string, unknown> = {};
+			for (const k of Object.keys(value as Record<string, unknown>).sort()) {
+				out[k] = sortDeep((value as Record<string, unknown>)[k]);
+			}
+			return out;
+		}
+		return value;
+	}
+
+	function depthOf(value: unknown): number {
+		if (Array.isArray(value)) return 1 + Math.max(0, ...value.map(depthOf));
+		if (value && typeof value === "object") {
+			const vals = Object.values(value as Record<string, unknown>);
+			return vals.length ? 1 + Math.max(...vals.map(depthOf)) : 1;
+		}
+		return 0;
+	}
+
+	/** 从 JSON.parse 的报错里挖出位置信息 */
+	function reportError(err: Error, text: string) {
+		const m = /position (\d+)/.exec(err.message);
+		let where = "";
+		if (m) {
+			const pos = Number(m[1]);
+			const before = text.slice(0, pos);
+			const line = before.split("\n").length;
+			const col = pos - before.lastIndexOf("\n");
+			where = ` · ${ui.line} ${line}, ${ui.col} ${col}`;
+		}
+		status.innerHTML = `<span class="note-warn">${ui.invalid}: ${err.message.replace(/^JSON.parse: /, "")}${where}</span>`;
+		output.value = "";
+	}
+
+	function run(kind: "format" | "minify") {
+		const text = input.value.trim();
+		if (!text) {
+			status.innerHTML = `<span class="note-warn">${ui.empty}</span>`;
+			return;
+		}
+		try {
+			let value = JSON.parse(text);
+			if (sortSel.value === "1") value = sortDeep(value);
+			const result = kind === "format" ? JSON.stringify(value, null, indentOf()) : JSON.stringify(value);
+			output.value = result;
+			const keys = (() => {
+				let n = 0;
+				const walk = (v: unknown) => {
+					if (Array.isArray(v)) v.forEach(walk);
+					else if (v && typeof v === "object") {
+						n += Object.keys(v as object).length;
+						Object.values(v as object).forEach(walk);
+					}
+				};
+				walk(value);
+				return n;
+			})();
+			status.innerHTML = `${ui.valid} · ${formatCount(keys)} ${ui.keys} · ${ui.depth} ${depthOf(value)} · ${formatCount(result.length)} ${ui.chars}`;
+		} catch (err) {
+			reportError(err as Error, text);
+		}
+	}
+
+	document.getElementById("format")!.addEventListener("click", () => run("format"));
+	document.getElementById("minify")!.addEventListener("click", () => run("minify"));
+	document.getElementById("validate")!.addEventListener("click", () => {
+		const text = input.value.trim();
+		if (!text) return;
+		try {
+			JSON.parse(text);
+			status.innerHTML = `${ui.valid} ✓`;
+		} catch (err) {
+			reportError(err as Error, text);
+		}
+});
+	document.getElementById("escape")!.addEventListener("click", () => {
+		output.value = JSON.stringify(input.value);
+		status.textContent = ui.done;
+});
+	document.getElementById("unescape")!.addEventListener("click", () => {
+		try {
+			const v = JSON.parse(input.value.trim());
+			output.value = typeof v === "string" ? v : JSON.stringify(v, null, indentOf());
+			status.textContent = ui.done;
+		} catch (err) {
+			reportError(err as Error, input.value);
+		}
+});
+	document.getElementById("clear")!.addEventListener("click", () => {
+		input.value = "";
+		output.value = "";
+		status.textContent = "";
+});
+	bindCopy(document.getElementById("copy") as HTMLButtonElement, () => output.value, ui.copied, ui.copy);
+	document.getElementById("save")!.addEventListener("click", () => {
+	const text = output.value || input.value;
+	if (text) downloadText("data.json", text, "application/json");
+});
+</script>

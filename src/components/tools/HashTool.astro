@@ -1,0 +1,102 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="iogrid" style="grid-template-columns:1fr">
+		<div>
+			<span class="label">{ui.input}</span>
+			<textarea id="input" placeholder="hello" spellcheck="false" style="min-height:150px"></textarea>
+		</div>
+	</div>
+
+	<div class="options">
+		<label class="field"><span class="lbl">{ui.case}</span>
+			<select id="upper">
+				<option value="0">{ui.lower}</option>
+				<option value="1">{ui.upper}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.fromFile}</span>
+			<input id="file" type="file" />
+		</label>
+	</div>
+
+	<div class="btns">
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-link" id="clear">{ui.clear}</button>
+	</div>
+	<p class="empty" id="status"></p>
+	<div id="results" hidden style="margin-top:16px"></div>
+</div>
+
+<script>
+	import { bindCopy, bytesToHex, md5 } from "../../lib/devtools.client";
+	import { escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const input = document.getElementById("input") as HTMLTextAreaElement;
+	const upper = document.getElementById("upper") as HTMLSelectElement;
+	const status = document.getElementById("status")!;
+	const results = document.getElementById("results")!;
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+
+	async function digest(algo: string, data: Uint8Array): Promise<string> {
+		const buf = await crypto.subtle.digest(algo, data as unknown as BufferSource);
+		return bytesToHex(buf);
+}
+
+	async function run() {
+		const text = input.value;
+		if (!text && !fileIn.files?.length) {
+			status.innerHTML = `<span class="note-warn">${ui.empty}</span>`;
+			return;
+		}
+		status.textContent = ui.working;
+		const data = fileIn.files?.length ? new Uint8Array(await fileIn.files[0].arrayBuffer()) : new TextEncoder().encode(text);
+		const list: { algo: string; value: string }[] = [{ algo: "MD5", value: md5(fileIn.files?.length ? "" : text) }];
+		if (fileIn.files?.length) {
+			// MD5 走字符串接口，文件场景按二进制转拉丁串（保持字节一致）
+			let bin = "";
+			for (const b of data) bin += String.fromCharCode(b);
+			list[0].value = md5(bin);
+		}
+		for (const algo of ["SHA-1", "SHA-256", "SHA-384", "SHA-512"]) {
+			list.push({ algo, value: await digest(algo, data) });
+		}
+		const u = upper.value === "1";
+		results.innerHTML = `<div class="card">${list
+			.map(
+				(h, i) =>
+					`<div class="hashrow"><span class="algo">${h.algo}</span><code id="h${i}">${escapeHtml(
+						u ? h.value.toUpperCase() : h.value,
+					)}</code><button class="btn-ghost" data-i="${i}">${ui.copy}</button></div>`,
+			)
+			.join("")}</div>`;
+		results.hidden = false;
+		results.querySelectorAll<HTMLButtonElement>("button[data-i]").forEach((btn) => {
+			const idx = Number(btn.dataset.i);
+			const raw = u ? list[idx].value.toUpperCase() : list[idx].value;
+			bindCopy(btn, () => raw, ui.copied, ui.copy);
+		});
+		status.innerHTML = `${ui.done} · ${data.length} ${ui.bytes}${fileIn.files?.length ? ` · ${fileIn.files[0].name}` : ""}`;
+	}
+
+	document.getElementById("run")!.addEventListener("click", run);
+	document.getElementById("clear")!.addEventListener("click", () => {
+	input.value = "";
+	fileIn.value = "";
+	results.hidden = true;
+	status.textContent = "";
+});
+	input.addEventListener("input", () => {
+	if (input.value && !fileIn.files?.length) run();
+});
+</script>

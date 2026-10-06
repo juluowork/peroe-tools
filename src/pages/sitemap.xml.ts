@@ -3,6 +3,9 @@ import { activeCategories, getTools, localePath, locales } from "../i18n";
 
 const origin = "https://tools.juluo.work";
 
+/** 构建日期作为 lastmod：告诉搜索引擎"内容有更新，值得重爬" */
+const buildDate = new Date().toISOString().slice(0, 10);
+
 export const GET: APIRoute = () => {
 	const tools = getTools("en");
 	const categories = activeCategories("en");

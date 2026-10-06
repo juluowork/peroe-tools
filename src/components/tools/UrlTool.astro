@@ -1,0 +1,120 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="options">
+		<label class="field"><span class="lbl">{ui.mode}</span>
+			<select id="mode">
+				<option value="encode">{ui.modeEncode}</option>
+				<option value="decode">{ui.modeDecode}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.scope}</span>
+			<select id="scope">
+				<option value="component">{ui.scopeComponent}</option>
+				<option value="full">{ui.scopeFull}</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="iogrid">
+		<div>
+			<span class="label">{ui.input}</span>
+			<textarea id="input" placeholder="https://example.com/搜索?q=hello world&amp;lang=zh" spellcheck="false"></textarea>
+		</div>
+		<div>
+			<span class="label">{ui.output}</span>
+			<textarea id="output" class="outbox" readonly spellcheck="false"></textarea>
+		</div>
+	</div>
+
+	<div class="btns">
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="parse">{ui.parse}</button>
+		<button class="btn-ghost" id="copy">{ui.copy}</button>
+		<button class="btn-link" id="clear">{ui.clear}</button>
+	</div>
+	<p class="empty" id="status"></p>
+	<div id="params" hidden style="margin-top:16px"></div>
+</div>
+
+<script>
+	import { bindCopy } from "../../lib/devtools.client";
+	import { escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const mode = document.getElementById("mode") as HTMLSelectElement;
+	const scope = document.getElementById("scope") as HTMLSelectElement;
+	const input = document.getElementById("input") as HTMLTextAreaElement;
+	const output = document.getElementById("output") as HTMLTextAreaElement;
+	const status = document.getElementById("status")!;
+	const params = document.getElementById("params")!;
+
+	function run() {
+		const text = input.value;
+		if (!text) {
+			status.textContent = ui.empty;
+			return;
+		}
+		try {
+			if (mode.value === "encode") {
+				output.value = scope.value === "full" ? encodeURI(text) : encodeURIComponent(text);
+			} else {
+				output.value = scope.value === "full" ? decodeURI(text) : decodeURIComponent(text);
+			}
+			status.innerHTML = `${ui.done} · ${output.value.length} ${ui.chars}`;
+		} catch (err) {
+			output.value = "";
+			status.innerHTML = `<span class="note-warn">${ui.invalid}: ${(err as Error).message}</span>`;
+		}
+	}
+
+	document.getElementById("run")!.addEventListener("click", run);
+	document.getElementById("clear")!.addEventListener("click", () => {
+	input.value = "";
+	output.value = "";
+	params.hidden = true;
+	status.textContent = "";
+});
+	bindCopy(document.getElementById("copy") as HTMLButtonElement, () => output.value, ui.copied, ui.copy);
+
+	// 解析查询参数：把 ?a=1&b=2 拆成表格
+	document.getElementById("parse")!.addEventListener("click", () => {
+	const text = input.value.trim();
+	const qIndex = text.indexOf("?");
+	const query = qIndex >= 0 ? text.slice(qIndex + 1) : text;
+	if (!query) {
+		status.innerHTML = `<span class="note-warn">${ui.empty}</span>`;
+		return;
+	}
+	const rows = query
+		.split("&")
+		.filter(Boolean)
+		.map((pair) => {
+			const eq = pair.indexOf("=");
+			const k = eq >= 0 ? pair.slice(0, eq) : pair;
+			const v = eq >= 0 ? pair.slice(eq + 1) : "";
+			const dec = (s: string) => {
+				try {
+					return decodeURIComponent(s.replace(/\+/g, " "));
+				} catch {
+					return s;
+				}
+			};
+			return { k: dec(k), v: dec(v) };
+		});
+	params.innerHTML = `<div class="card"><table class="exif">${rows
+		.map((r) => `<tr><th>${escapeHtml(r.k)}</th><td>${escapeHtml(r.v) || "—"}</td></tr>`)
+		.join("")}</table></div>`;
+	params.hidden = false;
+	status.innerHTML = `${ui.parsed} ${rows.length} ${ui.params}`;
+});
+</script>

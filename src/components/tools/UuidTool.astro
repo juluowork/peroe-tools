@@ -1,0 +1,86 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="options">
+		<label class="field"><span class="lbl">{ui.count}</span>
+			<input id="count" type="number" min="1" max="1000" step="1" value="5" />
+		</label>
+		<label class="field"><span class="lbl">{ui.case}</span>
+			<select id="upper">
+				<option value="0">{ui.lower}</option>
+				<option value="1">{ui.upper}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.style}</span>
+			<select id="style">
+				<option value="plain">{ui.stylePlain}</option>
+				<option value="braces">{ui.styleBraces}</option>
+				<option value="nohyphen">{ui.styleNoHyphen}</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="iogrid" style="grid-template-columns:1fr">
+		<div>
+			<span class="label">{ui.output}</span>
+			<textarea id="output" class="outbox" readonly spellcheck="false" style="min-height:220px"></textarea>
+		</div>
+	</div>
+
+	<div class="btns">
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="copy">{ui.copy}</button>
+		<button class="btn-ghost" id="save">{ui.save}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindCopy, downloadText, formatCount } from "../../lib/devtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const countIn = document.getElementById("count") as HTMLInputElement;
+	const upper = document.getElementById("upper") as HTMLSelectElement;
+	const style = document.getElementById("style") as HTMLSelectElement;
+	const output = document.getElementById("output") as HTMLTextAreaElement;
+	const status = document.getElementById("status")!;
+
+	function generate() {
+		const n = Math.min(1000, Math.max(1, Number(countIn.value) || 1));
+		const list: string[] = [];
+		for (let i = 0; i < n; i++) {
+			let id = crypto.randomUUID ? crypto.randomUUID() : fallbackUuid();
+			if (style.value === "braces") id = `{${id}}`;
+			if (style.value === "nohyphen") id = id.replace(/-/g, "");
+			list.push(upper.value === "1" ? id.toUpperCase() : id);
+		}
+		output.value = list.join("\n");
+		status.innerHTML = `${ui.done} · ${formatCount(n)} × UUID v4`;
+}
+
+	/** 极老浏览器兜底（crypto.randomUUID 缺失时） */
+	function fallbackUuid(): string {
+		const b = new Uint8Array(16);
+		crypto.getRandomValues(b);
+		b[6] = (b[6] & 0x0f) | 0x40;
+		b[8] = (b[8] & 0x3f) | 0x80;
+		const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+		return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+	document.getElementById("run")!.addEventListener("click", generate);
+	document.getElementById("save")!.addEventListener("click", () => {
+	if (output.value) downloadText("uuids.txt", output.value);
+});
+	bindCopy(document.getElementById("copy") as HTMLButtonElement, () => output.value, ui.copied, ui.copy);
+	generate();
+</script>

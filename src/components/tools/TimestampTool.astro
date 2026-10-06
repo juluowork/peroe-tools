@@ -1,0 +1,172 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="card" style="margin-bottom:16px">
+		<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline">
+			<div>
+				<div class="small muted">{ui.nowSeconds}</div>
+				<div id="now-s" style="font:700 26px/1.2 ui-monospace,Consolas,monospace">—</div>
+			</div>
+			<div>
+				<div class="small muted">{ui.nowMillis}</div>
+				<div id="now-ms" style="font:700 26px/1.2 ui-monospace,Consolas,monospace">—</div>
+			</div>
+			<button class="btn-ghost" id="useNow" style="margin-left:auto">{ui.useNow}</button>
+		</div>
+	</div>
+
+	<div class="options">
+		<label class="field"><span class="lbl">{ui.unit}</span>
+			<select id="unit">
+				<option value="auto">{ui.unitAuto}</option>
+				<option value="s">{ui.unitSeconds}</option>
+				<option value="ms">{ui.unitMillis}</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="iogrid">
+		<div>
+			<span class="label">{ui.tsInput}</span>
+			<textarea id="input" placeholder="1760000000" spellcheck="false" style="min-height:130px"></textarea>
+			<div class="btns"><button class="btn-primary" id="toDate">{ui.toDate}</button></div>
+		</div>
+		<div>
+			<span class="label">{ui.dateInput}</span>
+			<textarea id="dateInput" placeholder="2026-10-06 18:30:00" spellcheck="false" style="min-height:130px"></textarea>
+			<div class="btns"><button class="btn-primary" id="toTs">{ui.toTimestamp}</button></div>
+		</div>
+	</div>
+
+	<p class="empty" id="status"></p>
+	<div id="results" hidden style="margin-top:16px"></div>
+</div>
+
+<script>
+	import { bindCopy, formatCount } from "../../lib/devtools.client";
+	import { escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const input = document.getElementById("input") as HTMLTextAreaElement;
+	const dateInput = document.getElementById("dateInput") as HTMLTextAreaElement;
+	const unit = document.getElementById("unit") as HTMLSelectElement;
+	const status = document.getElementById("status")!;
+	const results = document.getElementById("results")!;
+	const nowS = document.getElementById("now-s")!;
+	const nowMs = document.getElementById("now-ms")!;
+
+	let currentSeconds = Math.floor(Date.now() / 1000);
+
+	function tick() {
+		currentSeconds = Math.floor(Date.now() / 1000);
+		nowS.textContent = String(currentSeconds);
+		nowMs.textContent = String(currentSeconds * 1000);
+}
+	tick();
+	setInterval(tick, 1000);
+
+	function rows(list: { k: string; v: string }[]) {
+		results.innerHTML = `<div class="card">${list
+			.map(
+				(r) =>
+					`<div class="hashrow"><span class="algo" style="flex-basis:150px">${escapeHtml(r.k)}</span><code>${escapeHtml(
+						r.v,
+					)}</code><button class="btn-ghost" data-v="${escapeHtml(r.v)}">${ui.copy}</button></div>`,
+			)
+			.join("")}</div>`;
+		results.hidden = false;
+		results.querySelectorAll<HTMLButtonElement>("button[data-v]").forEach((b) =>
+			bindCopy(b, () => b.dataset.v || "", ui.copied, ui.copy),
+		);
+}
+
+	function toDate() {
+		let raw = input.value.trim();
+		if (!raw) {
+			status.innerHTML = `<span class="note-warn">${ui.empty}</span>`;
+			return;
+		}
+		let n = Number(raw);
+		if (!Number.isFinite(n)) {
+			status.innerHTML = `<span class="note-warn">${ui.notNumber}</span>`;
+			return;
+		}
+		const mode = unit.value === "auto" ? (raw.replace("-", "").length >= 12 || n > 1e11 ? "ms" : "s") : unit.value;
+		if (mode === "ms") n = Math.floor(n / 1000);
+		const d = new Date(n * 1000);
+		if (Number.isNaN(d.getTime())) {
+			status.innerHTML = `<span class="note-warn">${ui.outOfRange}</span>`;
+			return;
+		}
+		status.innerHTML = `${ui.done} · ${ui.detected} ${mode === "ms" ? ui.unitMillis : ui.unitSeconds}`;
+		rows([
+			{ k: ui.local, v: d.toLocaleString() },
+			{ k: "ISO 8601 (UTC)", v: d.toISOString() },
+			{ k: "UTC", v: d.toUTCString() },
+			{ k: ui.relative, v: relative(d) },
+		]);
+}
+
+	function relative(d: Date): string {
+		const diff = Math.round((d.getTime() - Date.now()) / 1000);
+		const abs = Math.abs(diff);
+		const units: [number, string][] = [
+			[60, ui.uSecond], [60, ui.uMinute], [24, ui.uHour], [30, ui.uDay], [12, ui.uMonth], [Number.POSITIVE_INFINITY, ui.uYear],
+		];
+		let v = abs;
+		let label = ui.uSecond;
+		for (const [step, name] of units) {
+			label = name;
+			if (v < step) break;
+			v = v / step;
+		}
+		const n = Math.round(v);
+		return diff < 0 ? `${n} ${label} ${ui.ago}` : `${n} ${label} ${ui.later}`;
+}
+
+	function toTimestamp() {
+		const raw = dateInput.value.trim();
+		if (!raw) {
+			status.innerHTML = `<span class="note-warn">${ui.empty}</span>`;
+			return;
+		}
+		// 支持 "2026-10-06 18:30:00"（按本地时区）与 ISO 字符串
+		const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(raw) ? raw.replace(" ", "T") : raw;
+		const d = new Date(normalized);
+		if (Number.isNaN(d.getTime())) {
+			status.innerHTML = `<span class="note-warn">${ui.badDate}</span>`;
+			return;
+		}
+		const s = Math.floor(d.getTime() / 1000);
+		status.innerHTML = `${ui.done} · ${ui.parsedAs} ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
+		rows([
+			{ k: ui.seconds, v: String(s) },
+			{ k: ui.millis, v: String(s * 1000) },
+			{ k: "ISO 8601 (UTC)", v: d.toISOString() },
+		]);
+}
+
+	document.getElementById("useNow")!.addEventListener("click", () => {
+	input.value = String(currentSeconds);
+	unit.value = "s";
+	toDate();
+});
+	document.getElementById("toDate")!.addEventListener("click", toDate);
+	document.getElementById("toTs")!.addEventListener("click", toTimestamp);
+	input.addEventListener("input", () => {
+	if (input.value.trim()) toDate();
+});
+</script>
+
+<style>
+	:global(.hashrow code) { user-select: all; }
+</style>

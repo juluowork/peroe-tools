@@ -17,6 +17,12 @@ import ImageWatermarkTool from "../../components/tools/ImageWatermarkTool.astro"
 import HeicToJpgTool from "../../components/tools/HeicToJpgTool.astro";
 import ImageToIcoTool from "../../components/tools/ImageToIcoTool.astro";
 import ExifTool from "../../components/tools/ExifTool.astro";
+import JsonTool from "../../components/tools/JsonTool.astro";
+import Base64Tool from "../../components/tools/Base64Tool.astro";
+import UrlTool from "../../components/tools/UrlTool.astro";
+import HashTool from "../../components/tools/HashTool.astro";
+import UuidTool from "../../components/tools/UuidTool.astro";
+import TimestampTool from "../../components/tools/TimestampTool.astro";
 import { getSite, getTools } from "../../i18n";
 import type { ToolCopy } from "../../i18n";
 
@@ -48,6 +54,12 @@ const components: Record<string, typeof CompressTool> = {
 	"heic-to-jpg": HeicToJpgTool,
 	"image-to-ico": ImageToIcoTool,
 	"exif-viewer": ExifTool,
+	"json-formatter": JsonTool,
+	"base64": Base64Tool,
+	"url-encode": UrlTool,
+	"hash-generator": HashTool,
+	"uuid-generator": UuidTool,
+	"timestamp": TimestampTool,
 };
 const Tool = components[tool.slug];
 ---

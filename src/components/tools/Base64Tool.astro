@@ -1,0 +1,111 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="options">
+		<label class="field"><span class="lbl">{ui.mode}</span>
+			<select id="mode">
+				<option value="encode">{ui.modeEncode}</option>
+				<option value="decode">{ui.modeDecode}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.variant}</span>
+			<select id="variant">
+				<option value="std">{ui.std}</option>
+				<option value="url">{ui.urlSafe}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.fileToBase64}</span>
+			<input id="file" type="file" />
+		</label>
+	</div>
+
+	<div class="iogrid">
+		<div>
+			<span class="label">{ui.input}</span>
+			<textarea id="input" placeholder="Hello, 世界" spellcheck="false"></textarea>
+		</div>
+		<div>
+			<span class="label">{ui.output}</span>
+			<textarea id="output" class="outbox" readonly spellcheck="false"></textarea>
+		</div>
+	</div>
+
+	<div class="btns">
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="swap">{ui.swap}</button>
+		<button class="btn-ghost" id="copy">{ui.copy}</button>
+		<button class="btn-link" id="clear">{ui.clear}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindCopy, fromBase64, toBase64 } from "../../lib/devtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const mode = document.getElementById("mode") as HTMLSelectElement;
+	const variant = document.getElementById("variant") as HTMLSelectElement;
+	const input = document.getElementById("input") as HTMLTextAreaElement;
+	const output = document.getElementById("output") as HTMLTextAreaElement;
+	const status = document.getElementById("status")!;
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+
+	function run() {
+		const text = input.value;
+		if (!text) {
+			status.textContent = ui.empty;
+			return;
+		}
+		try {
+			if (mode.value === "encode") {
+				output.value = toBase64(text, variant.value === "url");
+				status.innerHTML = `${ui.done} · ${text.length} → ${output.value.length} ${ui.chars}`;
+			} else {
+				output.value = fromBase64(text);
+				status.innerHTML = `${ui.done} · ${text.length} → ${output.value.length} ${ui.chars}`;
+			}
+		} catch (err) {
+			output.value = "";
+			status.innerHTML = `<span class="note-warn">${ui.invalid}: ${(err as Error).message}</span>`;
+		}
+	}
+
+	document.getElementById("run")!.addEventListener("click", run);
+	document.getElementById("swap")!.addEventListener("click", () => {
+		const a = input.value;
+		input.value = output.value;
+		output.value = a;
+		mode.value = mode.value === "encode" ? "decode" : "encode";
+		if (input.value) run();
+});
+	document.getElementById("clear")!.addEventListener("click", () => {
+	input.value = "";
+	output.value = "";
+	status.textContent = "";
+});
+	bindCopy(document.getElementById("copy") as HTMLButtonElement, () => output.value, ui.copied, ui.copy);
+
+	// 文件 → Base64（含 data URL），大文件也只在内存里
+	fileIn.addEventListener("change", async () => {
+	const file = fileIn.files?.[0];
+	if (!file) return;
+	status.textContent = ui.reading;
+	const buf = new Uint8Array(await file.arrayBuffer());
+	let bin = "";
+	for (let i = 0; i < buf.length; i += 8192) bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+	const b64 = btoa(bin);
+	const dataUrl = `data:${file.type || "application/octet-stream"};base64,${b64}`;
+	input.value = file.name;
+	output.value = mode.value === "encode" && variant.value === "std" ? dataUrl : b64;
+	status.innerHTML = `${file.name} · ${(file.size / 1024).toFixed(1)} KB → ${b64.length} ${ui.chars}`;
+});
+</script>
