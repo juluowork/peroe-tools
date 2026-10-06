@@ -1,0 +1,248 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="row">
+		<input
+			id="uri"
+			type="text"
+			autocomplete="off"
+			spellcheck="false"
+			placeholder={ui.placeholder}
+			aria-label={ui.placeholder}
+		/>
+		<button class="btn-primary" id="go">{ui.calc}</button>
+	</div>
+	<p class="small muted" style="margin:6px 0 0">{ui.hint}</p>
+
+	<div id="out" hidden>
+		<div class="card-out">
+			<div class="code-wrap">
+				<div class="code" id="code">------</div>
+				<button class="sbtn" id="copy">{ui.copy}</button>
+			</div>
+			<div class="meta">
+				<div id="who" class="who"></div>
+				<div class="ring-wrap">
+					<svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+						<circle cx="22" cy="22" r="19" fill="none" stroke="var(--line)" stroke-width="4"></circle>
+						<circle id="ring" cx="22" cy="22" r="19" fill="none" stroke="var(--brand)" stroke-width="4"
+							stroke-linecap="round" stroke-dasharray="119.4" stroke-dashoffset="0"
+							transform="rotate(-90 22 22)"></circle>
+					</svg>
+					<span class="secs"><b id="secs">30</b>s</span>
+				</div>
+			</div>
+		</div>
+		<p class="small muted" id="params" style="margin:8px 0 0"></p>
+	</div>
+
+	<p class="empty" id="status"></p>
+
+	<details class="faq" id="selftest">
+		<summary>{ui.selfTest}</summary>
+		<div id="selfOut" class="small" style="margin-top:8px"></div>
+	</details>
+</div>
+
+<style>
+	.row { display: flex; gap: 10px; align-items: stretch; }
+	.row input {
+		flex: 1; min-width: 0; font: 400 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+		padding: 11px 13px; border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--fg);
+	}
+	.row input:focus { outline: 2px solid var(--brand-weak); border-color: var(--brand); }
+	.card-out { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--soft); padding: 16px; }
+	.code-wrap { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+	.code {
+		font: 700 40px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 6px; color: var(--fg);
+		font-variant-numeric: tabular-nums; word-break: break-all;
+	}
+	.meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+	.who { font-size: 13px; color: var(--muted); }
+	.ring-wrap { display: flex; align-items: center; gap: 6px; }
+	.secs { font: 600 14px/1 ui-monospace, monospace; color: var(--muted); }
+	.sbtn { font: 500 13px/1 inherit; padding: 9px 14px; min-height: 36px; cursor: pointer; border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--muted); }
+	.sbtn:hover { border-color: var(--brand); color: var(--brand-dark); }
+	.ok { color: var(--brand-dark); font-weight: 600; }
+	.bad { color: #e11d48; font-weight: 600; }
+</style>
+
+<script>
+	import { escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const uriIn = document.getElementById("uri") as HTMLInputElement;
+	const out = document.getElementById("out")!;
+	const codeEl = document.getElementById("code")!;
+	const whoEl = document.getElementById("who")!;
+	const paramsEl = document.getElementById("params")!;
+	const ring = document.getElementById("ring")!;
+	const secsEl = document.getElementById("secs")!;
+	const status = document.getElementById("status")!;
+
+	interface Cfg {
+		secret: Uint8Array;
+		digits: number;
+		period: number;
+		algorithm: string;
+		label: string;
+		counter?: number;
+	}
+	let cfg: Cfg | null = null;
+	let timer = 0;
+
+	/** RFC 4648 base32（不带填充、忽略空格与连字符、大小写不敏感） */
+	function base32Decode(input: string): Uint8Array {
+		const s = input.replace(/[\s-]/g, "").replace(/=+$/, "").toUpperCase();
+		const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+		let bits = 0;
+		let value = 0;
+		const outBytes: number[] = [];
+		for (const ch of s) {
+			const idx = alphabet.indexOf(ch);
+			if (idx < 0) throw new Error(ui.badChar.replace("{c}", ch));
+			value = (value << 5) | idx;
+			bits += 5;
+			if (bits >= 8) {
+				outBytes.push((value >>> (bits - 8)) & 0xff);
+				bits -= 8;
+			}
+		}
+		if (!outBytes.length) throw new Error(ui.badSecret);
+		return new Uint8Array(outBytes);
+	}
+
+	/** RFC 6238：HMAC → 动态截断 → 取模 */
+	async function hotp(c: Cfg, counter: number): Promise<string> {
+		const buf = new ArrayBuffer(8);
+		const view = new DataView(buf);
+		view.setUint32(0, Math.floor(counter / 2 ** 32));
+		view.setUint32(4, counter >>> 0);
+		const key = await crypto.subtle.importKey("raw", c.secret as unknown as BufferSource, { name: "HMAC", hash: c.algorithm }, false, ["sign"]);
+		const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, buf));
+		const off = sig[sig.length - 1] & 0x0f;
+		const bin = ((sig[off] & 0x7f) << 24) | (sig[off + 1] << 16) | (sig[off + 2] << 8) | sig[off + 3];
+		return String(bin % 10 ** c.digits).padStart(c.digits, "0");
+	}
+
+	/** 解析 otpauth:// 链接；也接受直接粘贴的 base32 密钥 */
+	function parse(input: string): Cfg {
+		const raw = input.trim();
+		if (!raw) throw new Error(ui.empty);
+		if (!/^otpauth:\/\//i.test(raw)) {
+			return { secret: base32Decode(raw), digits: 6, period: 30, algorithm: "SHA-1", label: "" };
+		}
+		let u: URL;
+		try {
+			u = new URL(raw);
+		} catch {
+			throw new Error(ui.badUri);
+		}
+		const type = u.host.toLowerCase();
+		const q = u.searchParams;
+		const secret = q.get("secret");
+		if (!secret) throw new Error(ui.noSecret);
+		const digits = Math.min(10, Math.max(4, Number(q.get("digits") || 6) || 6));
+		const period = Math.max(5, Number(q.get("period") || 30) || 30);
+		const algRaw = (q.get("algorithm") || "SHA1").toUpperCase().replace("-", "");
+		const algorithm = algRaw === "SHA256" ? "SHA-256" : algRaw === "SHA512" ? "SHA-512" : "SHA-1";
+		const path = decodeURIComponent(u.pathname.replace(/^\//, ""));
+		const issuer = q.get("issuer") || (path.includes(":") ? path.split(":")[0].trim() : "");
+		const account = path.includes(":") ? path.split(":").slice(1).join(":").trim() : path;
+		const label = [issuer, account].filter(Boolean).join(" · ");
+		const c: Cfg = { secret: base32Decode(secret), digits, period, algorithm, label };
+		if (type === "hotp") c.counter = Number(q.get("counter") || 0) || 0;
+		return c;
+	}
+
+	function tick() {
+		if (!cfg) return;
+		if (cfg.counter !== undefined) return; // HOTP 不随时间变
+		const now = Math.floor(Date.now() / 1000);
+		const remain = cfg.period - (now % cfg.period);
+		secsEl.textContent = String(remain);
+		ring.setAttribute("stroke-dashoffset", String(119.4 * (1 - remain / cfg.period)));
+	}
+
+	async function show(c: Cfg) {
+		cfg = c;
+		out.hidden = false;
+		whoEl.textContent = c.label || ui.noLabel;
+		paramsEl.textContent = ui.params
+			.replace("{alg}", c.algorithm.replace("SHA-", "SHA"))
+			.replace("{digits}", String(c.digits))
+			.replace("{period}", c.counter !== undefined ? `counter ${c.counter}` : `${c.period}s`);
+		clearInterval(timer);
+		const render = async () => {
+			const now = Math.floor(Date.now() / 1000);
+			const counter = c.counter !== undefined ? c.counter : Math.floor(now / c.period);
+			codeEl.textContent = (await hotp(c, counter)).replace(/(\d{3})(?=\d)/g, "$1 ");
+			tick();
+		};
+		await render();
+		if (c.counter === undefined) {
+			timer = window.setInterval(render, 1000);
+		}
+	}
+
+	document.getElementById("go")!.addEventListener("click", async () => {
+		status.textContent = "";
+		try {
+			await show(parse(uriIn.value));
+		} catch (err) {
+			out.hidden = true;
+			clearInterval(timer);
+			status.innerHTML = `<span class="note-warn">${escapeHtml((err as Error).message)}</span>`;
+		}
+	});
+	uriIn.addEventListener("keydown", (e) => {
+		if (e.key === "Enter") document.getElementById("go")!.dispatchEvent(new Event("click"));
+	});
+	uriIn.addEventListener("paste", () => setTimeout(() => document.getElementById("go")!.dispatchEvent(new Event("click")), 50));
+
+	document.getElementById("copy")!.addEventListener("click", async (e) => {
+		const btn = e.currentTarget as HTMLButtonElement;
+		await navigator.clipboard.writeText(codeEl.textContent!.replace(/\s/g, ""));
+		const old = btn.textContent;
+		btn.textContent = ui.copied;
+		setTimeout(() => (btn.textContent = old), 1200);
+	});
+
+	/** 站内自检：RFC 6238 附录 B 的标准测试向量（种子 "12345678901234567890"） */
+	const VECTORS: [number, string][] = [
+		[59, "94287082"],
+		[1111111109, "07081804"],
+		[1111111111, "14050471"],
+		[1234567890, "89005924"],
+		[2000000000, "69279037"],
+		[20000000000, "65353130"],
+	];
+	document.getElementById("selftest")!.addEventListener("toggle", async (e) => {
+		const el = e.currentTarget as HTMLDetailsElement;
+		if (!el.open) return;
+		const selfOut = document.getElementById("selfOut")!;
+		const c: Cfg = { secret: new TextEncoder().encode("12345678901234567890"), digits: 8, period: 30, algorithm: "SHA-1", label: "" };
+		const rows: string[] = [];
+		let pass = 0;
+		for (const [t, want] of VECTORS) {
+			const got = await hotp(c, Math.floor(t / 30));
+			const ok = got === want;
+			if (ok) pass++;
+			rows.push(`${ok ? "✅" : "❌"} T=${t} → ${got} ${ok ? "" : `（期望 ${want}）`}`);
+		}
+		selfOut.innerHTML =
+			`<div class="${pass === VECTORS.length ? "ok" : "bad"}">RFC 6238 标准向量：${pass}/${VECTORS.length} 通过</div>` +
+			`<pre style="margin:8px 0 0;white-space:pre-wrap">${rows.join("\n")}</pre>`;
+	});
+</script>
