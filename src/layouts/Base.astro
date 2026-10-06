@@ -41,6 +41,16 @@ const alt = origin + localePath(locale === "en" ? "zh" : "en", path);
 		<meta property="og:locale" content={locale === "en" ? "en_US" : "zh_CN"} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		{jsonLdList.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
+		<!-- 站长验证：Bing（token 是账号级的，与博客同一串；另有 public/BingSiteAuth.xml 兜底） -->
+		<meta name="msvalidate.01" content="91E5B16A2CD2E86042B923AF197EC312" />
+		<!-- 统计：Umami Cloud（无 Cookie、不采集个人数据）；data-domains 限定正式域名，避免本地调试污染数据 -->
+		<script
+			is:inline
+			defer
+			src="https://cloud.umami.is/script.js"
+			data-website-id="bc70c244-bba3-4e53-b275-c405b930c82e"
+			data-domains="tools.juluo.work"
+		></script>
 	</head>
 	<body>
 		<header class="site-header">
