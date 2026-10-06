@@ -21,7 +21,7 @@ export const site: SiteCopy = {
 		"Compress images, edit PDFs, format JSON and more — free tools that run right in your browser. Image, PDF, text and developer utilities in one place: no uploads, no accounts, no limits.",
 	homeH1: "Image, PDF and developer tools that never upload your files",
 	homeLead:
-		"Every tool on this site runs inside your browser. Pick a file, get your result — nothing is sent to a server, nothing is stored, and it still works offline.",
+		"Every tool here runs inside your browser. Whether you are handling a file, an image or a chunk of data, the result appears immediately — nothing is uploaded, nothing is stored, and it keeps working offline.",
 	homeWhyTitle: "Why local processing matters",
 	homeWhy: [
 		"Most online converters ask you to upload your file first. That is fine for a meme, but a contract, a passport scan, a medical report or an unreleased design is a different story — once uploaded, you no longer control where it lives or how long it is kept.",

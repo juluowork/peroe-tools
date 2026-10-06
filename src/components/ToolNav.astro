@@ -14,6 +14,13 @@ const { locale, site, tools, path } = Astro.props;
 const groups = toolsByCategory(locale);
 const other: Locale = locale === "en" ? "zh" : "en";
 const href = (p: string) => localePath(locale, p);
+/**
+ * ⚠️ 顶栏平铺的分类数量**固定为 2**，不再随分类增加而增长。
+ * 分类一多，顶栏就会挤成一排小字，且每加一个分类都要重排导航。
+ * 其余的分类统一走「更多▾」下拉与 `/categories/` 分类页 —— 那里本来就是全量列表。
+ */
+const NAV_FLAT_LIMIT = 2;
+const flatGroups = groups.slice(0, NAV_FLAT_LIMIT);
 ---
 
 <nav class="site-nav" aria-label={site.navLabel}>
@@ -23,7 +30,7 @@ const href = (p: string) => localePath(locale, p);
 		{site.navCategories}
 	</a>
 
-	{groups.slice(0, 3).map((g) => (
+	{flatGroups.map((g) => (
 		<a href={categoryPath(locale, g.category.id)} aria-current={path === `/${g.category.id}/` ? "page" : undefined}>
 			{g.category.name}
 		</a>
@@ -31,7 +38,7 @@ const href = (p: string) => localePath(locale, p);
 
 	<details class="nav-drop" id="nav-drop">
 		<summary>
-			{groups.length > 3 ? (locale === "en" ? "More" : "更多") : site.navAllTools}
+			{groups.length > NAV_FLAT_LIMIT ? (locale === "en" ? "More" : "更多") : site.navAllTools}
 			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
 				<path d="m6 9 6 6 6-6" />
 			</svg>
@@ -48,6 +55,9 @@ const href = (p: string) => localePath(locale, p);
 				))}
 				<div class="nav-col nav-col--cta">
 					<a class="nav-col-title" href={href("/categories/")}>{site.navCategories}</a>
+					<p class="small muted" style="margin:0 0 8px">
+						{locale === "en" ? "Every category, including the ones not in the top bar." : "所有分类都在这里，含未放进顶栏的那些。"}
+					</p>
 					<a class="nav-item" href={href("/tools/")} style="margin-bottom:8px">{site.navAllTools}</a>
 					<span class="pill">{tools.length} {locale === "en" ? "tools live" : "个工具已上线"}</span>
 				</div>

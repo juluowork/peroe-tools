@@ -11,17 +11,13 @@ interface Props {
 }
 const { locale, site, tools } = Astro.props;
 const origin = "https://tools.juluo.work";
-const categories: Record<string, string> = {
-	"compress-image": "Image",
-	"convert-image": "Image",
-	"resize-image": "Image",
-	"image-to-pdf": "PDF",
-};
-const cats = locale === "en"
-	? [["all", "All"], ["Image", "Image"], ["PDF", "PDF"]]
-	: [["all", "全部"], ["Image", "图片"], ["PDF", "PDF"]];
 const groups = toolsByCategory(locale);
-const catCount = activeCategories(locale).length;
+// ⚠️ 这里原来写死了分类（只认最早的 4 个工具），加了新工具后 tab 与卡片归类全错。
+// 现在一律从 i18n 的分类定义推导 —— 新增分类自动出现在 tab 里。
+const cats: [string, string][] = [
+	["all", locale === "en" ? "All" : "全部"],
+	...activeCategories(locale).map((c) => [c.id, c.name] as [string, string]),
+];
 
 const jsonLd = [
 	{
@@ -83,14 +79,14 @@ const jsonLd = [
 		</div>
 		<div class="grid" id="toolgrid">
 			{tools.map((t) => (
-				<a class="card" href={toolPath(locale, t)} data-cat={categories[t.slug] ?? "Image"}>
+				<a class="card" href={toolPath(locale, t)} data-cat={t.category}>
 					<div class="ico">
 						<Icon name={toolIcon(t.slug)} size={32} />
 					</div>
 					<h3>{t.nav}</h3>
 					<p>{t.blurb}</p>
 					<div class="cat">
-						{site.categories.find((c) => c.id === t.category)?.name ?? categories[t.slug]}
+						{site.categories.find((c) => c.id === t.category)?.name ?? t.category}
 					</div>
 				</a>
 			))}
