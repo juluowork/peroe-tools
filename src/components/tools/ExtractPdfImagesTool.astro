@@ -1,0 +1,253 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+	<ul class="filelist" id="list"></ul>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="zip" hidden>{ui.downloadZip}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+	<div class="pagetile" id="grid" style="margin-top:14px"></div>
+</div>
+
+<style>
+	#grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+	.tile { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+	.tile img { display: block; width: 100%; height: 120px; object-fit: contain; background: repeating-conic-gradient(#eef2f7 0% 25%, #fff 0% 50%) 50% / 16px 16px; }
+	.tile a { display: block; padding: 6px 8px; font-size: 12px; text-align: center; border-top: 1px solid var(--line); color: var(--brand-dark); text-decoration: none; }
+	.tile a:hover { background: var(--brand-weak); }
+</style>
+
+<script>
+	import { zipSync } from "fflate";
+	import { bindDropZone, clearBusy, download, escapeHtml, formatBytes, opButton, renderRow, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const grid = document.getElementById("grid")!;
+	const status = document.getElementById("status")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const zipBtn = document.getElementById("zip") as HTMLButtonElement;
+
+	let file: File | null = null;
+	let found: { name: string; blob: Blob; w: number; h: number }[] = [];
+
+	function render() {
+		list.innerHTML = "";
+		if (!file) {
+			dz.hidden = false;
+			dz.classList.remove("is-compact");
+			actions.hidden = true;
+			return;
+		}
+		const li = renderRow({ name: file.name, sizeText: formatBytes(file.size) });
+		li.querySelector(".ops")!.append(
+			opButton(ui.remove, "danger", () => {
+				file = null;
+				found = [];
+				grid.innerHTML = "";
+				zipBtn.hidden = true;
+				status.textContent = "";
+				render();
+			}),
+		);
+		list.appendChild(li);
+		dz.hidden = true;
+		actions.hidden = false;
+	}
+
+	bindDropZone(dz, fileIn, (files) => {
+		const f = files.find((x) => x.type === "application/pdf" || x.name.toLowerCase().endsWith(".pdf"));
+		if (!f) {
+			status.innerHTML = `<span class="note-warn">${ui.needPdf}</span>`;
+			return;
+		}
+		file = f;
+		found = [];
+		grid.innerHTML = "";
+		zipBtn.hidden = true;
+		status.textContent = "";
+		render();
+	});
+
+	/** pdf.js 的原始像素格式 → canvas。kind: 1=1bpp 灰度 2=RGB 3=RGBA */
+	function toCanvas(img: { width: number; height: number; kind?: number; data: Uint8Array | Uint8ClampedArray }) {
+		const { width: w, height: h, kind = 3 } = img;
+		const c = document.createElement("canvas");
+		c.width = w;
+		c.height = h;
+		const ctx = c.getContext("2d")!;
+		const out = ctx.createImageData(w, h);
+		const d = img.data;
+		if (kind === 3) {
+			out.data.set(d.length === w * h * 4 ? (d as Uint8ClampedArray) : new Uint8ClampedArray(d.buffer, d.byteOffset, w * h * 4));
+		} else if (kind === 2) {
+			for (let i = 0, j = 0; i < w * h; i++, j += 3) {
+				out.data[i * 4] = d[j];
+				out.data[i * 4 + 1] = d[j + 1];
+				out.data[i * 4 + 2] = d[j + 2];
+				out.data[i * 4 + 3] = 255;
+			}
+		} else {
+			// 1bpp：每字节 8 个像素，1 = 白
+			const rowBytes = (w + 7) >> 3;
+			for (let y = 0; y < h; y++) {
+				for (let x = 0; x < w; x++) {
+					const bit = (d[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1;
+					const v = bit ? 255 : 0;
+					const i = (y * w + x) * 4;
+					out.data[i] = out.data[i + 1] = out.data[i + 2] = v;
+					out.data[i + 3] = 255;
+				}
+			}
+		}
+		ctx.putImageData(out, 0, 0);
+		return c;
+	}
+
+	runBtn.addEventListener("click", async () => {
+		if (!file) return;
+		setBusy(runBtn, ui.working);
+		status.textContent = ui.working;
+		grid.innerHTML = "";
+		found = [];
+		zipBtn.hidden = true;
+		try {
+			const bytes = await file.arrayBuffer();
+			const lib = await import("../../lib/pdfjs.client");
+			const pdfjs = await lib.loadPdfJs();
+			const opened = await lib.openPdf(bytes);
+			const seen = new Set<string>();
+
+			for (let p = 1; p <= opened.numPages; p++) {
+				const page = await opened.doc.getPage(p);
+				// ⚠️ 关键：pdf.js 是**懒解码**的 —— 不先渲染这一页，图片对象就没有解析好，
+				//    objs.get() 只能拿到一部分（实测会漏掉 JPEG）。渲染一次即可全部就绪。
+				const vp = page.getViewport({ scale: 1 });
+				const tmp = document.createElement("canvas");
+				tmp.width = Math.max(1, Math.floor(vp.width));
+				tmp.height = Math.max(1, Math.floor(vp.height));
+				await page.render({ canvasContext: tmp.getContext("2d")!, viewport: vp }).promise;
+				const ops = await page.getOperatorList();
+				for (let i = 0; i < ops.fnArray.length; i++) {
+					const fn = ops.fnArray[i];
+					const isImg = fn === pdfjs.OPS.paintImageXObject || fn === pdfjs.OPS.paintInlineImageXObject || fn === pdfjs.OPS.paintJpegXObject;
+					if (!isImg) continue;
+					const arg = ops.argsArray[i][0];
+					const key = typeof arg === "string" ? arg : `inline-${p}-${i}`;
+					if (seen.has(key)) continue;
+					seen.add(key);
+					let obj: any;
+					try {
+						if (typeof arg !== "string") {
+							obj = arg;
+						} else {
+							// ⚠️ pdf.js 的坑：objs.get(name, callback) 在对象「已经解析好」时
+							// **不会调用回调**（直接同步返回），所以先试同步取，再退回回调。
+							try {
+								obj = page.objs.get(arg);
+							} catch {
+								obj = undefined;
+							}
+							if (!obj) obj = await new Promise((res) => page.objs.get(arg, res));
+						}
+					} catch {
+						continue;
+					}
+					if (!obj) continue;
+					let blob: Blob | null = null;
+					let w = Number(obj.width) || 0;
+					let h = Number(obj.height) || 0;
+					const toPng = (c: HTMLCanvasElement) =>
+						new Promise<Blob | null>((res) => c.toBlob((b) => res(b), "image/png"));
+					if (obj.data && obj.data.length > 4 && !obj.kind && obj.data[0] === 0xff && obj.data[1] === 0xd8) {
+						// 原始 JPEG 字节：直接用，画质无损
+						blob = new Blob([obj.data as BlobPart], { type: "image/jpeg" });
+					} else if (obj.bitmap && obj.bitmap.width > 0 && obj.bitmap.height > 0) {
+						const c = document.createElement("canvas");
+						c.width = obj.bitmap.width;
+						c.height = obj.bitmap.height;
+						c.getContext("2d")!.drawImage(obj.bitmap, 0, 0);
+						w = c.width;
+						h = c.height;
+						blob = await toPng(c);
+					} else if (obj.data && w > 0 && h > 0) {
+						blob = await toPng(toCanvas(obj));
+					}
+					// ⚠️ 尺寸为 0 时 canvas.toBlob 会返回 null —— 必须跳过，否则后面读 blob.type 会抛
+					if (!blob || !w || !h) continue;
+					found.push({ name: `p${p}-${found.length + 1}-${w}x${h}.${blob.type === "image/jpeg" ? "jpg" : "png"}`, blob, w, h });
+				}
+			}
+
+			if (!found.length) {
+				status.innerHTML = `<span class="note-warn">${ui.none}</span>`;
+				clearBusy(runBtn);
+				return;
+			}
+
+			found.forEach((f) => {
+				const cell = document.createElement("div");
+				cell.className = "tile";
+				const im = document.createElement("img");
+				im.src = URL.createObjectURL(f.blob);
+				im.alt = f.name;
+				im.loading = "lazy";
+				const a = document.createElement("a");
+				a.href = "#";
+				a.textContent = `${f.w}×${f.h}`;
+				a.addEventListener("click", (e) => {
+					e.preventDefault();
+					download(f.blob, f.name);
+				});
+				cell.append(im, a);
+				grid.appendChild(cell);
+			});
+			zipBtn.hidden = false;
+			const total = found.reduce((s, f) => s + f.blob.size, 0);
+			status.innerHTML = `${ui.done} · <b>${found.length}</b> ${ui.images} · ${formatBytes(total)}`;
+		} catch (err) {
+			status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+		clearBusy(runBtn);
+	});
+
+	zipBtn.addEventListener("click", async () => {
+		if (!found.length) return;
+		status.textContent = ui.zipping;
+		const entries = await Promise.all(
+			found.map(async (f) => [f.name, new Uint8Array(await f.blob.arrayBuffer())] as const),
+		);
+		const zip = zipSync(Object.fromEntries(entries), { level: 0 });
+		download(new Blob([zip as BlobPart], { type: "application/zip" }), `${(file?.name ?? "pdf").replace(/\.pdf$/i, "")}-images.zip`);
+		status.innerHTML = `${ui.done} · ${found.length} ${ui.images} → zip`;
+	});
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		file = null;
+		found = [];
+		grid.innerHTML = "";
+		zipBtn.hidden = true;
+		status.textContent = "";
+		fileIn.value = "";
+		render();
+	});
+</script>

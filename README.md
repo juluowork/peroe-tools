@@ -15,6 +15,14 @@
   页面文案已如实写明这两条；实测整页外发总量 **1115 字节 / 2 条请求**（最大 841 字节）。
 - 自测：`test-whylocal.mjs` —— 断言「外发字节 < 4KB」「请求体不含文件名/文件内容」，而不是断言「零请求」。
 
+## ⚠️ 未上线的工具：PDF 提取图片
+
+`src/components/tools/ExtractPdfImagesTool.astro` 已写好但**未注册**（从路由与 i18n 里移除，页面 404）。
+原因：用 pdf.js 的 `page.getOperatorList()` + `objs.get()` 提取内嵌图时，**JPEG 内嵌图会被静默漏掉**
+（实测 3 张图只取到 1 张，且不报错）。已经试过：① `objs.get(name, cb)` 的同步/异步双路径；② 先 `page.render()`
+强制解码；③ 尺寸/blob 空值防御 —— 都没解决。**会静默漏文件的工具不能上线**，宁可没有。
+后续方向：改用 pdf-lib 直接遍历 XObject，或把漏检情况显式报给用户（"本页有 N 张图未能提取"）。
+
 ## PWA（可安装 + 真离线）
 
 - `public/manifest.webmanifest` + 图标（192/512/maskable/apple-touch）+ `public/sw.js`
