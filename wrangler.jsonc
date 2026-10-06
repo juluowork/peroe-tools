@@ -1,0 +1,16 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "peroe-tools",
+	"compatibility_date": "2025-08-11",
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "404-page"
+	},
+	// 与博客同一套规则：Workers Routes + 手写 DNS，不用自定义域（原因见博客仓库 AGENTS.md §5.1）
+	"routes": [
+		{
+			"pattern": "tools.juluo.work/*",
+			"zone_name": "juluo.work"
+		}
+	]
+}

@@ -1,0 +1,20 @@
+{
+	"name": "peroe-tools",
+	"type": "module",
+	"version": "1.0.0",
+	"private": true,
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro preview",
+		"deploy": "astro build && wrangler deploy",
+		"check": "astro check"
+	},
+	"dependencies": {
+		"astro": "^5.0.0",
+		"pdf-lib": "^1.17.1"
+	},
+	"devDependencies": {
+		"wrangler": "^4.0.0"
+	}
+}

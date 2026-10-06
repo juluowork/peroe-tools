@@ -1,0 +1,58 @@
+---
+import Base from "../layouts/Base.astro";
+import { tools } from "../lib/tools";
+
+const jsonLd = {
+	"@context": "https://schema.org",
+	"@type": "WebSite",
+	name: "peroe 工具箱",
+	url: "https://tools.juluo.work/",
+	description: "免费、免注册、不上传文件的在线图片与 PDF 工具。",
+};
+---
+
+<Base
+	title="peroe 工具箱 — 免费在线图片与 PDF 工具（本地处理，不上传）"
+	description="免费在线图片压缩、格式转换、尺寸调整与图片转 PDF 工具。全部在浏览器本地完成，文件不上传服务器，无需注册。"
+	jsonLd={jsonLd}
+>
+	<span class="badge">100% 本地处理 · 不上传 · 免注册</span>
+	<h1>在线图片与 PDF 工具</h1>
+	<p class="lead">
+		所有工具都在你的浏览器里运行：文件不会离开这台设备，也不需要注册或安装任何东西。
+		断网也能用，处理速度取决于你的电脑而不是别人的服务器。
+	</p>
+
+	<div class="tools-grid">
+		{tools.map((t) => (
+			<a class="card" href={`/${t.slug}/`}>
+				<h2>{t.short}</h2>
+				<p>{t.blurb}</p>
+			</a>
+		))}
+	</div>
+
+	<div class="ad-slot" data-ad-slot="home-top"></div>
+
+	<h2>为什么把处理放在本地？</h2>
+	<p>
+		绝大多数在线转换工具需要你先把文件传到它们的服务器上。对合同、证件、身份证扫描件、设计稿这类东西来说，
+		上传意味着文件离开了你的控制范围 —— 你不知道它会被保存多久、是否会被用于训练或分析。
+	</p>
+	<p>
+		这里的工具采用另一种做法：把编解码放到浏览器里（Canvas 与 WebAssembly），
+		<b>你的图片只存在于本机内存中</b>，关闭标签页即消失。这不是隐私政策里的承诺，而是架构上的必然 ——
+		本站没有任何接收文件的服务端接口。
+	</p>
+
+	<h2>常见问题</h2>
+	<details class="faq"><summary>真的完全不上传吗？</summary>
+		<p>是。页面不包含文件上传代码，处理全部由浏览器 API 完成。你可以在浏览器开发者工具的 Network 面板里自行确认：除了网页本身的静态资源，没有任何包含文件内容的上传请求。</p>
+	</details>
+	<details class="faq"><summary>有使用次数或文件大小限制吗？</summary>
+		<p>没有次数限制。单文件大小只受你设备内存限制，通常几十 MB 的图片都没有问题；处理大量文件时建议分批进行。</p>
+	</details>
+	<details class="faq"><summary>手机上能用吗？</summary>
+		<p>可以。界面自适应手机屏幕，但批量处理大图时电脑体验更好。</p>
+	</details>
+</Base>

@@ -1,0 +1,144 @@
+---
+import Base from "../layouts/Base.astro";
+import { toolBySlug } from "../lib/tools";
+
+const tool = toolBySlug("resize-image")!;
+const FAQ = tool.faq;
+const faqLd = {
+	"@context": "https://schema.org",
+	"@type": "FAQPage",
+	mainEntity: FAQ.map((f) => ({
+		"@type": "Question",
+		name: f.q,
+		aacceptedAnswer: { "@type": "Answer", text: f.a },
+	})),
+};
+---
+
+<Base title={tool.title} description={tool.description} jsonLd={faqLd}>
+	<span class="badge">本地缩放 · 不上传</span>
+	<h1>图片缩放 / 调整尺寸</h1>
+	<p class="lead">
+		按像素或百分比改变图片尺寸，默认锁定宽高比不变形，支持批量。
+		处理在浏览器本地完成，图片不出本机。
+	</p>
+
+	<div class="card">
+		<div class="dropzone" id="dz">点击选择图片，或把图片拖到这里（可多选）</div>
+		<input id="file" type="file" accept="image/*" multiple hidden />
+		<div class="row">
+			<label class="field">宽度（px）
+				<input id="w" type="number" min="1" step="1" placeholder="留空 = 自动" />
+			</label>
+			<label class="field">高度（px）
+				<input id="h" type="number" min="1" step="1" placeholder="留空 = 自动" />
+			</label>
+			<label class="field">或按百分比
+				<input id="pct" type="number" min="1" max="400" step="1" placeholder="例如 50" />
+			</label>
+			<label class="field">锁定宽高比
+				<select id="lock"><option value="1">是（推荐）</option><option value="0">否（可能变形）</option></select>
+			</label>
+			<button id="run" disabled>开始缩放</button>
+		</div>
+		<p class="hint">批量时：宽/高只填一个，另一个自动按各自比例推算，适合把一堆图统一到同一宽度。</p>
+	</div>
+
+	<ul class="results" id="results"></ul>
+
+	<div class="ad-slot" data-ad-slot="tool-mid"></div>
+
+	<h2>常见用途</h2>
+	<ul>
+		<li><b>网站配图</b>：把 4000px 的照片压到 1600px 宽，再配合压缩，体积可降一个数量级。</li>
+		<li><b>社交平台</b>：按要求裁到固定边长（如头像 512×512）。</li>
+		<li><b>邮件/文档</b>：缩小截图避免超出页面宽度。</li>
+	</ul>
+
+	<h2>常见问题</h2>
+	{FAQ.map((f) => (
+		<details class="faq"><summary>{f.q}</summary><p>{f.a}</p></details>
+	))}
+</Base>
+
+<script>
+	import { bindDropZone, encode, download, formatBytes, loadImage, replaceExt, extFor } from "../lib/imgtools.client";
+
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const results = document.getElementById("results")!;
+	const wIn = document.getElementById("w") as HTMLInputElement;
+	const hIn = document.getElementById("h") as HTMLInputElement;
+	const pctIn = document.getElementById("pct") as HTMLInputElement;
+	const lock = document.getElementById("lock") as HTMLSelectElement;
+
+	let files: File[] = [];
+	bindDropZone(dz, input, (picked) => {
+		files = picked.filter((f) => f.type.startsWith("image/"));
+		runBtn.disabled = files.length === 0;
+		dz.textContent = files.length ? `已选择 ${files.length} 张，点击可重新选择` : "点击选择图片，或把图片拖到这里（可多选）";
+	});
+
+	runBtn.addEventListener("click", async () => {
+	runBtn.disabled = true;
+	results.innerHTML = "";
+	const targetW = Number(wIn.value || 0);
+	const targetH = Number(hIn.value || 0);
+	const pct = Number(pctIn.value || 0);
+	if (!targetW && !targetH && !pct) {
+		alert("请填写宽度、高度或百分比中的至少一项。");
+		runBtn.disabled = false;
+		return;
+	}
+	const keepRatio = lock.value === "1";
+	for (const file of files) {
+		const li = document.createElement("li");
+		li.innerHTML = `<span class="name">${file.name}</span><span class="size">处理中…</span>`;
+		results.appendChild(li);
+		try {
+			const img = await loadImage(file);
+			let tw = img.width;
+			let th = img.height;
+			if (pct) {
+				tw = Math.round((img.width * pct) / 100);
+				th = Math.round((img.height * pct) / 100);
+			} else if (targetW && targetH) {
+				tw = targetW;
+				th = keepRatio ? Math.round((img.height * targetW) / img.width) : targetH;
+			} else if (targetW) {
+				tw = targetW;
+				th = Math.round((img.height * targetW) / img.width);
+			} else {
+				th = targetH;
+				tw = Math.round((img.width * targetH) / img.height);
+			}
+			if (!keepRatio && targetW && targetH) {
+				tw = targetW;
+				th = targetH;
+			}
+			const mime = file.type === "image/png" || file.type === "image/webp" ? file.type : "image/jpeg";
+			const blob = await encode(img, {
+				mime,
+				quality: 0.9,
+				width: tw,
+				height: th,
+				background: mime === "image/jpeg" ? "#ffffff" : null,
+			});
+			const url = URL.createObjectURL(blob);
+			li.innerHTML = `
+				<img class="thumb" src="${url}" alt="" />
+				<span class="name">${file.name}</span>
+				<span class="size">${img.width}×${img.height} → <b>${tw}×${th}</b>（${formatBytes(blob.size)}）</span>`;
+			const btn = document.createElement("button");
+			btn.textContent = "下载";
+			btn.addEventListener("click", () => download(blob, replaceExt(file.name, extFor(mime))));
+			li.appendChild(btn);
+			img.bitmap.close();
+		} catch (err) {
+			li.innerHTML = `<span class="name">${file.name}</span><span class="size">失败：${(err as Error).message}</span>`;
+		}
+	}
+	runBtn.disabled = false;
+});
+</script>
