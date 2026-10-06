@@ -5,3 +5,5 @@ dist/
 .dev.vars
 *.log
 .DS_Store
+# 本地辅助文件（真正的 IndexNow 密钥在 public/<key>.txt，那才是要公开的）
+indexnow-key.txt
