@@ -1,0 +1,344 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="image/*" hidden />
+
+	<div id="editor" hidden>
+		<div class="anno-bar">
+			<div class="anno-tools">
+				<button type="button" class="anno-tool" data-tool="rect" aria-pressed="true">{ui.tRect}</button>
+				<button type="button" class="anno-tool" data-tool="ellipse">{ui.tEllipse}</button>
+				<button type="button" class="anno-tool" data-tool="arrow">{ui.tArrow}</button>
+				<button type="button" class="anno-tool" data-tool="pen">{ui.tPen}</button>
+				<button type="button" class="anno-tool" data-tool="text">{ui.tText}</button>
+				<button type="button" class="anno-tool" data-tool="mosaic">{ui.tMosaic}</button>
+				<button type="button" class="anno-tool" data-tool="solid">{ui.tSolid}</button>
+			</div>
+
+			<div class="anno-opts">
+				<label class="anno-field">
+					<span>{ui.color}</span>
+					<span class="anno-colors" id="colors">
+						<button type="button" class="sw" data-c="#e11d48" style="background:#e11d48" aria-pressed="true"></button>
+						<button type="button" class="sw" data-c="#f59e0b" style="background:#f59e0b"></button>
+						<button type="button" class="sw" data-c="#00bb88" style="background:#00bb88"></button>
+						<button type="button" class="sw" data-c="#2563eb" style="background:#2563eb"></button>
+						<button type="button" class="sw" data-c="#111827" style="background:#111827"></button>
+						<button type="button" class="sw" data-c="#ffffff" style="background:#fff"></button>
+					</span>
+				</label>
+				<label class="anno-field">
+					<span>{ui.width}</span>
+					<input id="width" type="range" min="1" max="24" value="6" />
+				</label>
+				<label class="anno-field" id="textField" hidden>
+					<span>{ui.textLabel}</span>
+					<input id="textValue" type="text" value={ui.textDefault} style="width:150px" />
+				</label>
+			</div>
+		</div>
+
+		<p class="small muted" id="hint" style="margin:10px 0 0">{ui.hint}</p>
+		<div class="anno-stage">
+			<canvas id="cv"></canvas>
+		</div>
+
+		<div class="btns">
+			<button class="btn-primary" id="save">{ui.save}</button>
+			<button class="btn-ghost" id="undo">{ui.undo}</button>
+			<button class="btn-ghost" id="clearMarks">{ui.clearMarks}</button>
+			<button class="btn-link" id="reset">{ui.startOver}</button>
+		</div>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<style>
+	.anno-bar {
+		display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+		padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--soft);
+	}
+	.anno-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+	.anno-tool {
+		font: 500 13px/1 inherit; padding: 8px 12px; min-height: 34px;
+		border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--muted); cursor: pointer;
+	}
+	.anno-tool:hover { border-color: var(--brand); color: var(--brand-dark); }
+	.anno-tool[aria-pressed="true"] { background: var(--brand-weak); border-color: var(--brand); color: var(--brand-dark); font-weight: 600; }
+	.anno-opts { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-left: auto; font-size: 13px; color: var(--muted); }
+	.anno-field { display: flex; align-items: center; gap: 7px; }
+	.anno-colors { display: inline-flex; gap: 4px; }
+	.sw { width: 20px; height: 20px; border-radius: 5px; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+	.sw[aria-pressed="true"] { border-color: var(--brand); }
+	.anno-stage { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; background: #f1f5f9; }
+	.anno-stage canvas { display: block; max-width: 100%; cursor: crosshair; touch-action: none; }
+</style>
+
+<script>
+	import { bindDropZone, clearBusy, download, escapeHtml, loadImage, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+	const editor = document.getElementById("editor")!;
+	const hint = document.getElementById("hint")!;
+	const stage = document.querySelector(".anno-stage") as HTMLElement;
+	const cv = document.getElementById("cv") as HTMLCanvasElement;
+	const ctx = cv.getContext("2d")!;
+	const status = document.getElementById("status")!;
+	const textField = document.getElementById("textField")!;
+	const textValue = document.getElementById("textValue") as HTMLInputElement;
+	const widthIn = document.getElementById("width") as HTMLInputElement;
+
+	type Shape =
+		| { t: "rect"; x: number; y: number; w: number; h: number; c: string; s: number }
+		| { t: "ellipse"; x: number; y: number; w: number; h: number; c: string; s: number }
+		| { t: "arrow"; x1: number; y1: number; x2: number; y2: number; c: string; s: number }
+		| { t: "pen"; pts: number[][]; c: string; s: number }
+		| { t: "text"; x: number; y: number; text: string; c: string; s: number }
+		| { t: "mosaic"; x: number; y: number; w: number; h: number }
+		| { t: "solid"; x: number; y: number; w: number; h: number; c: string };
+
+	let img: HTMLImageElement | null = null;
+	/** bindDropZone 读完文件后会清空 input，所以文件名要在选文件时就记下来 */
+	let srcName = "image";
+	let natural = { w: 0, h: 0 };
+	let scale = 1;
+	let tool = "rect";
+	let color = "#e11d48";
+	let shapes: Shape[] = [];
+	let draft: Shape | null = null;
+	let drawing = false;
+	let start = { x: 0, y: 0 };
+	/** 马赛克在小尺寸离屏画布上做，避免每次重绘都很慢 */
+	const off = document.createElement("canvas");
+	const offCtx = off.getContext("2d")!;
+
+	function toImg(ev: PointerEvent) {
+		const r = cv.getBoundingClientRect();
+		return { x: (ev.clientX - r.left) / scale, y: (ev.clientY - r.top) / scale };
+	}
+
+	/** 把矩形区域的底图打码（缩小再放大 + 关掉插值） */
+	function pixelate(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, block: number) {
+		if (!img || w < 2 || h < 2) return;
+		const bw = Math.max(1, Math.round(w / block));
+		const bh = Math.max(1, Math.round(h / block));
+		off.width = bw;
+		off.height = bh;
+		offCtx.imageSmoothingEnabled = true;
+		offCtx.drawImage(img, x, y, w, h, 0, 0, bw, bh);
+		g.imageSmoothingEnabled = false;
+		g.drawImage(off, 0, 0, bw, bh, x, y, w, h);
+		g.imageSmoothingEnabled = true;
+	}
+
+	function drawArrow(g: CanvasRenderingContext2D, s: { x1: number; y1: number; x2: number; y2: number }, k: number) {
+		const { x1, y1, x2, y2 } = s;
+		g.beginPath();
+		g.moveTo(x1, y1);
+		g.lineTo(x2, y2);
+		g.stroke();
+		const a = Math.atan2(y2 - y1, x2 - x1);
+		const head = Math.max(10, (k || 1) * 6 * 2);
+		g.beginPath();
+		g.moveTo(x2, y2);
+		g.lineTo(x2 - head * Math.cos(a - Math.PI / 7), y2 - head * Math.sin(a - Math.PI / 7));
+		g.moveTo(x2, y2);
+		g.lineTo(x2 - head * Math.cos(a + Math.PI / 7), y2 - head * Math.sin(a + Math.PI / 7));
+		g.stroke();
+	}
+
+	/** 把图形画到任意 ctx（scale=1 即原图尺寸，用于导出） */
+	function paint(g: CanvasRenderingContext2D, list: Shape[], k: number) {
+		g.lineCap = "round";
+		g.lineJoin = "round";
+		for (const s of list) {
+			g.strokeStyle = "c" in s ? s.c : "#111";
+			g.fillStyle = "c" in s ? s.c : "#111";
+			if ("s" in s) g.lineWidth = Math.max(1, s.s * k);
+			if (s.t === "rect") g.strokeRect(s.x * k, s.y * k, s.w * k, s.h * k);
+			else if (s.t === "solid") g.fillRect(s.x * k, s.y * k, s.w * k, s.h * k);
+			else if (s.t === "ellipse") {
+				g.beginPath();
+				g.ellipse((s.x + s.w / 2) * k, (s.y + s.h / 2) * k, Math.abs(s.w / 2) * k, Math.abs(s.h / 2) * k, 0, 0, Math.PI * 2);
+				g.stroke();
+			} else if (s.t === "arrow") drawArrow(g, { x1: s.x1 * k, y1: s.y1 * k, x2: s.x2 * k, y2: s.y2 * k }, k);
+			else if (s.t === "pen") {
+				g.beginPath();
+				s.pts.forEach((p, i) => (i ? g.lineTo(p[0] * k, p[1] * k) : g.moveTo(p[0] * k, p[1] * k)));
+				g.stroke();
+			} else if (s.t === "text") {
+				g.font = `700 ${Math.max(12, s.s * 4) * k}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
+				g.textBaseline = "top";
+				g.fillText(s.text, s.x * k, s.y * k);
+			} else if (s.t === "mosaic") pixelate(g, s.x * k, s.y * k, s.w * k, s.h * k, Math.max(4, (s.w * k) / 40));
+		}
+	}
+
+	function render() {
+		if (!img) return;
+		ctx.clearRect(0, 0, cv.width, cv.height);
+		ctx.drawImage(img, 0, 0, cv.width, cv.height);
+		paint(ctx, draft ? [...shapes, draft] : shapes, scale);
+	}
+
+	function fit() {
+		if (!img) return;
+		const maxW = Math.min(stage.parentElement?.clientWidth ?? 900, 1100);
+		scale = Math.min(1, maxW / natural.w);
+		cv.width = Math.round(natural.w * scale);
+		cv.height = Math.round(natural.h * scale);
+		render();
+	}
+
+	bindDropZone(dz, fileIn, async (picked) => {
+		const f = picked.find((x) => x.type.startsWith("image/"));
+		if (!f) return;
+		srcName = f.name;
+		const loaded = await loadImage(f);
+		const bitmap = loaded.bitmap;
+		const tmp = document.createElement("canvas");
+		tmp.width = bitmap.width;
+		tmp.height = bitmap.height;
+		tmp.getContext("2d")!.drawImage(bitmap, 0, 0);
+		natural = { w: bitmap.width, h: bitmap.height };
+		const im = new Image();
+		im.src = tmp.toDataURL("image/png");
+		await im.decode();
+		img = im;
+		shapes = [];
+		dz.hidden = true;
+		editor.hidden = false;
+		status.textContent = "";
+		fit();
+	});
+
+	// 工具切换
+	for (const btn of document.querySelectorAll<HTMLButtonElement>(".anno-tool")) {
+		btn.addEventListener("click", () => {
+			tool = btn.dataset.tool!;
+			for (const b of document.querySelectorAll(".anno-tool")) b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+			textField.hidden = tool !== "text";
+			hint.textContent = tool === "mosaic" || tool === "solid" ? ui.hintMask : ui.hint;
+			cv.style.cursor = tool === "text" ? "text" : "crosshair";
+		});
+	}
+	for (const sw of document.querySelectorAll<HTMLButtonElement>(".sw")) {
+		sw.addEventListener("click", () => {
+			color = sw.dataset.c!;
+			for (const s of document.querySelectorAll(".sw")) s.setAttribute("aria-pressed", s === sw ? "true" : "false");
+		});
+	}
+
+	cv.addEventListener("pointerdown", (ev) => {
+		if (!img) return;
+		cv.setPointerCapture(ev.pointerId);
+		const p = toImg(ev);
+		start = p;
+		drawing = true;
+		const s = Number(widthIn.value);
+		if (tool === "rect") draft = { t: "rect", x: p.x, y: p.y, w: 0, h: 0, c: color, s };
+		else if (tool === "ellipse") draft = { t: "ellipse", x: p.x, y: p.y, w: 0, h: 0, c: color, s };
+		else if (tool === "arrow") draft = { t: "arrow", x1: p.x, y1: p.y, x2: p.x, y2: p.y, c: color, s };
+		else if (tool === "pen") draft = { t: "pen", pts: [[p.x, p.y]], c: color, s };
+		else if (tool === "mosaic") draft = { t: "mosaic", x: p.x, y: p.y, w: 0, h: 0 };
+		else if (tool === "solid") draft = { t: "solid", x: p.x, y: p.y, w: 0, h: 0, c: color };
+		else if (tool === "text") {
+			const text = textValue.value.trim() || ui.textDefault;
+			shapes.push({ t: "text", x: p.x, y: p.y, text, c: color, s });
+			drawing = false;
+			draft = null;
+			render();
+			return;
+		}
+		render();
+	});
+
+	cv.addEventListener("pointermove", (ev) => {
+		if (!drawing || !draft) return;
+		const p = toImg(ev);
+		if (draft.t === "rect" || draft.t === "ellipse" || draft.t === "mosaic" || draft.t === "solid") {
+			draft.x = Math.min(start.x, p.x);
+			draft.y = Math.min(start.y, p.y);
+			draft.w = Math.abs(p.x - start.x);
+			draft.h = Math.abs(p.y - start.y);
+		} else if (draft.t === "arrow") {
+			draft.x2 = p.x;
+			draft.y2 = p.y;
+		} else if (draft.t === "pen") {
+			draft.pts.push([p.x, p.y]);
+		}
+		render();
+	});
+
+	function commit() {
+		if (!drawing || !draft) return;
+		const d = draft;
+		const tiny = (d.t === "rect" || d.t === "ellipse" || d.t === "mosaic" || d.t === "solid") && (d.w < 3 || d.h < 3);
+		if (!tiny) shapes.push(d);
+		draft = null;
+		drawing = false;
+		render();
+	}
+	cv.addEventListener("pointerup", commit);
+	cv.addEventListener("pointercancel", commit);
+	cv.addEventListener("pointerleave", commit);
+
+	document.getElementById("undo")!.addEventListener("click", () => {
+		shapes.pop();
+		render();
+	});
+	document.getElementById("clearMarks")!.addEventListener("click", () => {
+		shapes = [];
+		render();
+	});
+	document.getElementById("reset")!.addEventListener("click", () => {
+		img = null;
+		shapes = [];
+		editor.hidden = true;
+		dz.hidden = false;
+		dz.classList.remove("is-compact");
+		status.textContent = "";
+		fileIn.value = "";
+	});
+
+	document.getElementById("save")!.addEventListener("click", async () => {
+		if (!img) return;
+		const btn = document.getElementById("save") as HTMLButtonElement;
+		setBusy(btn, ui.working);
+		try {
+			const out = document.createElement("canvas");
+			out.width = natural.w;
+			out.height = natural.h;
+			const g = out.getContext("2d")!;
+			g.drawImage(img, 0, 0, natural.w, natural.h);
+			paint(g, shapes, 1);
+			const blob: Blob = await new Promise((res, rej) =>
+				out.toBlob((b) => (b ? res(b) : rej(new Error("export failed"))), "image/png"),
+			);
+			const base = srcName.replace(/\.[^.]+$/, "") || "image";
+			download(blob, `${base}-annotated.png`);
+			status.innerHTML = `${ui.done} · ${shapes.length} ${ui.marks}`;
+		} catch (err) {
+			status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+		clearBusy(btn);
+	});
+
+	window.addEventListener("resize", () => {
+		if (img) fit();
+	});
+</script>

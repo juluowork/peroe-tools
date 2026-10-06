@@ -1766,4 +1766,69 @@ export const tools: ToolCopy[] = [
 			fail: "fails",
 		},
 	},
+	{
+		slug: "annotate-image",
+		category: "image",
+		icon: "pen",
+		accent: "#2563eb",
+		nav: "Annotate & redact",
+		h1: "Draw on a screenshot and redact what should stay private",
+		metaTitle: "Annotate & Redact Images — Arrows, Text, Mosaic, No Upload",
+		blurb: "Arrows, text, mosaic and solid redaction",
+		lead: "For the moment you need to explain something with a circle and an arrow — or send a screenshot with an ID number blacked out. No image editor to install, and the picture never leaves your machine.",
+		keywords: ["annotate screenshot", "draw on image", "add arrow to image", "censor image", "blur part of image", "mosaic photo", "redact screenshot", "图片标注", "图片打码", "截图马赛克"],
+		metaDescription:
+			"Draw arrows, boxes, ellipses and text on a screenshot, or hide sensitive parts with a mosaic or solid block. Runs in your browser, so the screenshot is never uploaded.",
+		steps: [
+			"Drop in a screenshot or photo.",
+			"Pick a tool — rectangle, ellipse, arrow, freehand, text, mosaic or solid block — and drag on the image.",
+			"Adjust colour and thickness, undo if needed, then save a PNG at the original resolution.",
+		],
+		notes: [
+			{
+				title: "Mosaic versus solid block",				body: "Mosaic keeps the layout readable while destroying the details, which is what you want over a name or an account number in a screenshot. A solid block hides everything underneath — use it when nothing about that area should be visible at all.",
+			},
+			{
+				title: "The annotations are burned in",				body: "Everything is drawn onto the pixels of the exported PNG, so there is no hidden layer that can be peeled off. That also means you cannot undo after saving — keep the original if you might need a clean version.",
+			},
+			{
+				title: "Export is always full resolution",				body: "You edit on a scaled-down preview, but the saved file is rendered at the image's original pixel size, so arrows and text stay crisp.",
+			},
+		],
+		faq: [
+			{
+				q: "Is a mosaic really enough to hide a phone number?",				a: "A mosaic with small blocks can sometimes be partially reconstructed, so for anything truly sensitive use the solid block instead — it replaces the area with a flat colour and no information survives.",
+			},
+			{
+				q: "Can I annotate several screenshots in one go?",				a: "The editor works on one image at a time, since every annotation is placed by hand. Work through a batch one by one; each save returns you to a fresh canvas.",
+			},
+			{
+				q: "Why is this safer than an online editor?",				a: "Screenshots of chats, tickets and dashboards routinely contain names, tokens and internal URLs. Here the drawing happens on a canvas inside the page — nothing is uploaded, so there is no copy to leak.",
+			},
+		],
+		ui: {
+			...uiCommon,
+			dropzone: "Drop a screenshot or photo here",
+			tRect: "Rectangle",
+			tEllipse: "Ellipse",
+			tArrow: "Arrow",
+			tPen: "Freehand",
+			tText: "Text",
+			tMosaic: "Mosaic",
+			tSolid: "Solid block",
+			color: "Colour",
+			width: "Thickness",
+			textLabel: "Text",
+			textDefault: "Note",
+			hint: "Drag on the image to draw. Switch tools above; text is placed where you click.",
+			hintMask: "Drag over the area to hide. Mosaic keeps the shape readable, solid block hides it completely.",
+			save: "Save annotated PNG",
+			undo: "Undo",
+			clearMarks: "Clear marks",
+			working: "Rendering…",
+			done: "Saved",
+			marks: "marks",
+			failed: "Failed",
+		},
+	},
 ];
