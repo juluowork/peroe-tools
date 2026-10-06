@@ -1,4 +1,4 @@
-﻿import type { APIRoute } from "astro";
+import type { APIRoute } from "astro";
 import { activeCategories, getTools, localePath, locales } from "../i18n";
 
 const origin = "https://tools.juluo.work";
@@ -28,6 +28,7 @@ export const GET: APIRoute = () => {
 		for (const l of locales) {
 			entries.push(`\t<url>
 \t\t<loc>${origin}${localePath(l, p)}</loc>
+\t\t<lastmod>${buildDate}</lastmod>
 \t\t<changefreq>weekly</changefreq>
 \t\t<priority>${p === "/" ? "1.0" : "0.8"}</priority>
 ${alts}
