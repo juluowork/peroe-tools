@@ -89,6 +89,7 @@ const TOOL_ICONS: Record<string, string> = {
 	"stitch-image": "merge",
 	"tile-image": "pages",
 	"qr-code": "grid",
+	"id-card-sheet": "pages",
 	"image-to-ico": "image",
 	"exif-viewer": "image",
 	"heic-to-jpg": "convert",

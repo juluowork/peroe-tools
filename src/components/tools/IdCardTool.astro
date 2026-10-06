@@ -1,0 +1,375 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="slots">
+		<div class="slot" data-slot="front">
+			<div class="slot-head"><b>{ui.front}</b><span class="small muted">{ui.frontHint}</span></div>
+			<div class="slot-body">
+				<img alt="" hidden />
+				<p class="slot-empty">{ui.dropHere}</p>
+			</div>
+			<div class="slot-ops">
+				<button type="button" class="sbtn" data-act="rotate" hidden>⟳ {ui.rotate}</button>
+				<button type="button" class="sbtn danger" data-act="clear" hidden>{ui.remove}</button>
+			</div>
+		</div>
+		<div class="slot" data-slot="back">
+			<div class="slot-head"><b>{ui.back}</b><span class="small muted">{ui.backHint}</span></div>
+			<div class="slot-body">
+				<img alt="" hidden />
+				<p class="slot-empty">{ui.dropHere}</p>
+			</div>
+			<div class="slot-ops">
+				<button type="button" class="sbtn" data-act="rotate" hidden>⟳ {ui.rotate}</button>
+				<button type="button" class="sbtn danger" data-act="clear" hidden>{ui.remove}</button>
+			</div>
+		</div>
+	</div>
+	<input id="file" type="file" accept="image/*" multiple hidden />
+
+	<div class="options" id="options" hidden>
+		<label class="field"><span class="lbl">{ui.layout}</span>
+			<select id="layout">
+				<option value="v">{ui.layoutV}</option>
+				<option value="h">{ui.layoutH}</option>
+				<option value="a4">{ui.layoutA4}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.crop}</span>
+			<select id="crop">
+				<option value="1">{ui.cropOn}</option>
+				<option value="0">{ui.cropOff}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.gap} <b id="gv">24</b>px</span>
+			<input id="gap" type="range" min="0" max="120" value="24" />
+		</label>
+		<label class="field"><span class="lbl">{ui.bg}</span>
+			<select id="bg">
+				<option value="#ffffff">White</option>
+				<option value="#f1f5f9">Light grey</option>
+				<option value="transparent">{ui.transparent}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.format}</span>
+			<select id="format">
+				<option value="image/png">PNG</option>
+				<option value="image/jpeg">JPG</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.watermark}</span>
+			<input id="wm" type="text" value={ui.wmDefault} style="min-width:200px" />
+		</label>
+	</div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+	<div id="preview" hidden style="margin-top:14px"></div>
+</div>
+
+<style>
+	.slots { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+	.slot { border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; background: var(--soft); }
+	.slot-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+	.slot-body { display: grid; place-items: center; min-height: 150px; padding: 12px; background: var(--bg); }
+	.slot-body img { max-width: 100%; max-height: 190px; border-radius: 6px; display: block; }
+	.slot-body.is-over { outline: 2px dashed var(--brand); outline-offset: -8px; }
+	.slot-empty { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
+	.slot-ops { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); }
+	.sbtn { font: 500 13px/1 inherit; padding: 7px 11px; min-height: 32px; cursor: pointer; border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--muted); }
+	.sbtn:hover { border-color: var(--brand); color: var(--brand-dark); }
+	.sbtn.danger:hover { border-color: #e11d48; color: #e11d48; }
+	.options { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--soft); }
+	.field { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+	.field input[type="text"] { font: 400 14px/1.4 inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--fg); }
+</style>
+
+<script>
+	import { clearBusy, download, escapeHtml, loadImage, opButton, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+	const options = document.getElementById("options")!;
+	const actions = document.getElementById("actions")!;
+	const status = document.getElementById("status")!;
+	const preview = document.getElementById("preview")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const gapIn = document.getElementById("gap") as HTMLInputElement;
+	const gv = document.getElementById("gv")!;
+	gapIn.addEventListener("input", () => (gv.textContent = gapIn.value));
+
+	/** 每个槽位存一份「原始方向」的画布，旋转只改这个值，导出时才真正转 */
+	const slots: Record<string, { canvas: HTMLCanvasElement; rotate: number } | null> = { front: null, back: null };
+	const CARD_RATIO = 85.6 / 54; // 二代身份证标准比例
+
+	const slotEl = (name: string) => document.querySelector(`.slot[data-slot="${name}"]`) as HTMLElement;
+
+	function renderSlot(name: string) {
+		const el = slotEl(name);
+		const img = el.querySelector("img") as HTMLImageElement;
+		const empty = el.querySelector(".slot-empty") as HTMLElement;
+		const [rotateBtn, clearBtn] = [...el.querySelectorAll(".sbtn")] as HTMLButtonElement[];
+		const data = slots[name];
+		if (!data) {
+			img.hidden = true;
+			img.removeAttribute("src");
+			empty.hidden = false;
+			rotateBtn.hidden = true;
+			clearBtn.hidden = true;
+			return;
+		}
+		img.src = data.canvas.toDataURL("image/jpeg", 0.7);
+		img.hidden = false;
+		empty.hidden = true;
+		rotateBtn.hidden = false;
+		clearBtn.hidden = false;
+		options.hidden = false;
+		actions.hidden = false;
+	}
+
+	for (const name of ["front", "back"]) {
+		const el = slotEl(name);
+		el.addEventListener("click", (e) => {
+			const btn = (e.target as HTMLElement).closest(".sbtn");
+			if (!btn) return;
+			const data = slots[name];
+			if (!data) return;
+			const act = (btn as HTMLElement).dataset.act;
+			if (act === "rotate") data.rotate = (data.rotate + 90) % 360;
+			if (act === "clear") slots[name] = null;
+			renderSlot(name);
+		});
+		for (const evt of ["dragenter", "dragover"]) {
+			el.addEventListener(evt, (e) => {
+				e.preventDefault();
+				el.querySelector(".slot-body")!.classList.add("is-over");
+			});
+		}
+		for (const evt of ["dragleave", "drop"]) {
+			el.addEventListener(evt, (e) => {
+				e.preventDefault();
+				el.querySelector(".slot-body")!.classList.remove("is-over");
+			});
+		}
+		el.addEventListener("drop", (e) => {
+			const f = (e as DragEvent).dataTransfer?.files?.[0];
+			if (f) put(name, f);
+		});
+		// 点槽位也能选文件（一次选两张时按顺序填入空槽）
+		el.querySelector(".slot-body")!.addEventListener("click", () => {
+			fileIn.dataset.target = name;
+			fileIn.click();
+		});
+	}
+
+	async function put(name: string, f: File) {
+		const img = await loadImage(f);
+		const c = document.createElement("canvas");
+		c.width = img.width;
+		c.height = img.height;
+		c.getContext("2d")!.drawImage(img.bitmap, 0, 0);
+		img.bitmap.close();
+		slots[name] = { canvas: c, rotate: 0 };
+		renderSlot(name);
+	}
+
+	fileIn.addEventListener("change", async () => {
+		const files = [...(fileIn.files ?? [])];
+		fileIn.value = "";
+		for (const f of files) {
+			const target = slots.front ? (slots.back ? null : "back") : "front";
+			if (!target) break;
+			await put(target, f);
+		}
+	});
+
+	/** 需要时按证件比例居中裁切，并应用旋转 */
+	function prepare(name: string, crop: boolean) {
+		const data = slots[name];
+		if (!data) return null;
+		const src = data.canvas;
+		let c = src;
+		if (data.rotate) {
+			const swap = data.rotate === 90 || data.rotate === 270;
+			const out = document.createElement("canvas");
+			out.width = swap ? src.height : src.width;
+			out.height = swap ? src.width : src.height;
+			const g = out.getContext("2d")!;
+			g.translate(out.width / 2, out.height / 2);
+			g.rotate((data.rotate * Math.PI) / 180);
+			g.drawImage(src, -src.width / 2, -src.height / 2);
+			c = out;
+		}
+		if (!crop) return c;
+		// 居中裁成标准证件比例：以能容纳的最大同比例矩形为准
+		let w = c.width;
+		let h = Math.round(w / CARD_RATIO);
+		if (h > c.height) {
+			h = c.height;
+			w = Math.round(h * CARD_RATIO);
+		}
+		const out = document.createElement("canvas");
+		out.width = w;
+		out.height = h;
+		out.getContext("2d")!.drawImage(c, Math.round((c.width - w) / 2), Math.round((c.height - h) / 2), w, h, 0, 0, w, h);
+		return out;
+	}
+
+	/** 把「仅供办理 XX 使用」之类的字样铺在证件上 —— 复印件被挪用的第一道防线 */
+	function addWatermark(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, text: string) {
+		if (!text.trim()) return;
+		g.save();
+		// 必须裁剪在证件范围内：文字带旋转，字角会溅到页面留白上，打印出来很脏
+		g.beginPath();
+		g.rect(x, y, w, h);
+		g.clip();
+		g.globalAlpha = 0.22;
+		g.fillStyle = "#0f172a";
+		g.font = `600 ${Math.max(12, Math.round(w / 16))}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
+		g.textBaseline = "middle";
+		g.textAlign = "center";
+		const stepX = Math.max(120, w / 2.4);
+		const stepY = Math.max(60, h / 3.2);
+		for (let yy = y + stepY / 2; yy < y + h; yy += stepY) {
+			for (let xx = x + stepX / 2; xx < x + w; xx += stepX) {
+				g.save();
+				g.translate(xx, yy);
+				g.rotate(-Math.PI / 9);
+				g.fillText(text, 0, 0);
+				g.restore();
+			}
+		}
+		g.restore();
+	}
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		slots.front = null;
+		slots.back = null;
+		renderSlot("front");
+		renderSlot("back");
+		options.hidden = true;
+		actions.hidden = true;
+		preview.hidden = true;
+		preview.innerHTML = "";
+		status.textContent = "";
+	});
+
+	runBtn.addEventListener("click", async () => {
+		const crop = (document.getElementById("crop") as HTMLSelectElement).value === "1";
+		const layout = (document.getElementById("layout") as HTMLSelectElement).value;
+		const gap = Number(gapIn.value);
+		const bg = (document.getElementById("bg") as HTMLSelectElement).value;
+		const mime = (document.getElementById("format") as HTMLSelectElement).value;
+		const wm = (document.getElementById("wm") as HTMLInputElement).value;
+		const front = prepare("front", crop);
+		const back = prepare("back", crop);
+		if (!front && !back) {
+			status.innerHTML = `<span class="note-warn">${ui.needImages}</span>`;
+			return;
+		}
+		setBusy(runBtn, ui.working);
+		// 立刻清掉上一次的预览：否则处理期间那个「下载」按钮还在，用户点下去拿到的是旧结果
+		preview.hidden = true;
+		preview.innerHTML = "";
+		status.textContent = ui.working;
+		try {
+			const out = document.createElement("canvas");
+			let boxes: { img: HTMLCanvasElement; x: number; y: number }[] = [];
+
+			if (layout === "a4") {
+				// A4 @300dpi，证件按 1:1 实际尺寸（85.6×54mm）摆放，可直接打印提交
+				const DPI = 300;
+				const mm = (v: number) => Math.round((v / 25.4) * DPI);
+				out.width = mm(210);
+				out.height = mm(297);
+				const cw = mm(85.6);
+				const ch = mm(54);
+				const drawn: HTMLCanvasElement[] = [];
+				for (const src of [front, back]) {
+					if (!src) continue;
+					const t = document.createElement("canvas");
+					t.width = cw;
+					t.height = ch;
+					t.getContext("2d")!.drawImage(src, 0, 0, cw, ch);
+					drawn.push(t);
+				}
+				const totalH = drawn.length * ch + (drawn.length - 1) * mm(10);
+				let y = Math.round((out.height - totalH) / 2);
+				for (const d of drawn) {
+					boxes.push({ img: d, x: Math.round((out.width - cw) / 2), y });
+					y += ch + mm(10);
+				}
+			} else if (layout === "v") {
+				const ids = [front, back].filter(Boolean) as HTMLCanvasElement[];
+				const w = Math.max(...ids.map((i) => i.width));
+				out.width = w;
+				out.height = ids.reduce((s, i) => s + i.height, 0) + gap * (ids.length - 1);
+				let y = 0;
+				for (const i of ids) {
+					boxes.push({ img: i, x: Math.round((w - i.width) / 2), y });
+					y += i.height + gap;
+				}
+			} else {
+				const ids = [front, back].filter(Boolean) as HTMLCanvasElement[];
+				const h = Math.max(...ids.map((i) => i.height));
+				out.height = h;
+				out.width = ids.reduce((s, i) => s + i.width, 0) + gap * (ids.length - 1);
+				let x = 0;
+				for (const i of ids) {
+					boxes.push({ img: i, x, y: Math.round((h - i.height) / 2) });
+					x += i.width + gap;
+				}
+			}
+
+			const g = out.getContext("2d")!;
+			if (bg !== "transparent") {
+				g.fillStyle = bg;
+				g.fillRect(0, 0, out.width, out.height);
+			}
+			for (const b of boxes) g.drawImage(b.img, b.x, b.y);
+			for (const b of boxes) addWatermark(g, b.x, b.y, b.img.width, b.img.height, wm);
+
+			const blob: Blob = await new Promise((res, rej) =>
+				out.toBlob((x) => (x ? res(x) : rej(new Error("export failed"))), mime, 0.94),
+			);
+			const ext = mime === "image/jpeg" ? "jpg" : "png";
+			const name = layout === "a4" ? `id-card-a4-300dpi.${ext}` : `id-card.${ext}`;
+
+			preview.innerHTML = "";
+			const bar = document.createElement("div");
+			bar.className = "btns";
+			bar.append(opButton(ui.download, "primary", () => download(blob, name)));
+			preview.append(bar);
+			const card = document.createElement("div");
+			card.className = "card";
+			card.style.marginTop = "12px";
+			const thumb = document.createElement("img");
+			thumb.src = out.toDataURL("image/jpeg", 0.6);
+			thumb.alt = name;
+			thumb.style.cssText = "display:block;max-width:100%;max-height:560px;margin:0 auto;border:1px solid var(--line);border-radius:10px";
+			card.append(thumb);
+			preview.append(card);
+			preview.hidden = false;
+			status.innerHTML = `${ui.done} · <b>${out.width}×${out.height}</b> px${
+				layout === "a4" ? ` · ${ui.a4Note}` : ""
+			}${wm.trim() ? ` · ${ui.wmOn}` : ""}`;
+		} catch (err) {
+			status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+		clearBusy(runBtn);
+	});
+</script>
