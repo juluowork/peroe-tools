@@ -86,6 +86,7 @@ const TOOL_ICONS: Record<string, string> = {
 	"watermark-image": "image",
 	"annotate-image": "pen",
 	"crop-image": "crop",
+	"stitch-image": "merge",
 	"image-to-ico": "image",
 	"exif-viewer": "image",
 	"heic-to-jpg": "convert",

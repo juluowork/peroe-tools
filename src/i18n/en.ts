@@ -1894,4 +1894,63 @@ export const tools: ToolCopy[] = [
 			failed: "Failed",
 		},
 	},
+	{
+		slug: "stitch-image",
+		category: "image",
+		icon: "merge",
+		accent: "#2563eb",
+		nav: "Stitch images",
+		h1: "Stitch screenshots into one long image",
+		metaTitle: "Merge Images & Screenshots — Stitch Vertically or Horizontally",
+		blurb: "Join images into one long picture, in your order",
+		lead: "The usual reason is a chat or a receipt spread over six screenshots that nobody wants to open one by one. Paste them here, get one image.",
+		keywords: ["merge images", "combine screenshots", "stitch photos", "long screenshot", "join images vertically", "聊天记录拼长图", "图片拼接", "长截图拼接"],
+		metaDescription:
+			"Combine several screenshots or photos into a single long image: drag to order them, match the width automatically, add a gap or background. Nothing is uploaded.",
+		steps: [
+			"Add two or more images — the list order is the final order.",
+			"Move them up or down, then choose vertical or horizontal, a gap, and an optional background.",
+			"Turn on uniform width if the screenshots have different widths (chat screenshots usually do), then save.",
+		],
+		notes: [
+			{
+				title: "Uniform width is the setting that matters",				body: "Chat screenshots often differ by a few pixels in width, which shows up as a ragged edge. Matching them to the widest one and scaling the rest proportionally gives a clean straight strip.",
+			},
+			{
+				title: "Transparent or solid background",				body: "Choose transparent for PNG output if the images have rounded corners or shadows you want to keep. Choose a solid colour for JPG, which cannot store transparency.",
+			},
+		],
+		faq: [
+			{
+				q: "Is there a limit on how many images I can join?",				a: "No fixed limit — only your device memory. Twenty tall screenshots produce a very large canvas; keep an eye on the previewed pixel size, and consider splitting into two images if it goes far beyond 10000 px.",
+			},
+			{
+				q: "Why did my stitched image come out blurry?",				a: "It does not upscale: each image is drawn at its original resolution. If a part looks soft, that part was already soft — the tool only arranges, it never resamples unless uniform width forces a scale.",
+			},
+			{
+				q: "Can I stitch PDFs the same way?",				a: "Not here — convert the pages to images with the PDF-to-images tool first, then stitch. That keeps the pipeline local.",
+			},
+		],
+		ui: {
+			...uiCommon,
+			dropzone: "Drop two or more screenshots here",
+			direction: "Direction",
+			dirVertical: "Vertical (stacked)",
+			dirHorizontal: "Horizontal (side by side)",
+			gap: "Gap",
+			bg: "Background",
+			bgTransparent: "Transparent (PNG)",
+			uniform: "Uniform width",
+			uniformOff: "Keep original sizes",
+			uniformOn: "Match the widest image",
+			padding: "Outer margin",
+			format: "Format",
+			run: "Stitch images",
+			reverse: "Reverse order",
+			working: "Stitching…",
+			done: "Stitched",
+			images: "images",
+			failed: "Failed",
+		},
+	},
 ];
