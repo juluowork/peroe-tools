@@ -36,6 +36,7 @@
 | **二维码生成与识别**（PNG/SVG、中心 logo、截图/粘贴/摄像头扫码） | `/convert/qr-code/` | `qrcode` + `jsqr`，均按需加载 |
 | **证件合成一页**（正反面拼接 / A4 实际尺寸 / 限用用途水印） | `/image/id-card-sheet/` | Canvas 合成 + 裁剪路径水印 |
 | **PDF 加密与解密**（AES-128/256、限制打印复制、去密码） | `/pdf/protect-pdf/` | **qpdf 编译成 wasm**，放 `public/qpdf/`，按需加载 |
+| **PDF 手写签名**（手写 → 点页面放置 → 多页可签） | `/pdf/sign-pdf/` | pdf.js 渲染 + pdf-lib 嵌图 |
 | **JSON 格式化**（美化 / 压缩 / 校验 / 排序） | `/dev/json-formatter/` | 原生 `JSON.parse` |
 | **Base64**（UTF-8 安全 / 文件转 Data URL） | `/dev/base64/` | `TextEncoder` + `btoa` |
 | **URL 编解码**（含查询参数解析） | `/dev/url-encode/` | `encodeURI` / `encodeURIComponent` |
