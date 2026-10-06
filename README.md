@@ -25,6 +25,10 @@
 | 图片压缩（画质 / 目标体积 / 批量） | `/image/compress-image/` | Canvas `toBlob()` |
 | 格式转换（JPG / PNG / WebP / AVIF） | `/image/convert-image/` | Canvas `toBlob()` |
 | 缩放（锁比例 / 批量） | `/image/resize-image/` | Canvas `drawImage()` |
+| **图片加水印**（6 种版式 / 批量） | `/image/watermark-image/` | Canvas + `drawText` |
+| **HEIC → JPG**（任意浏览器） | `/image/heic-to-jpg/` | 原生解码优先 + `libheif` wasm 兜底 |
+| **图片转 ICO**（16–256 px 多尺寸） | `/image/image-to-ico/` | 手写 ICO 容器 + Canvas |
+| **EXIF 查看与清理** | `/image/exif-viewer/` | `exifr` 读取 + Canvas 重编码清除 |
 | 图片合成 PDF | `/pdf/image-to-pdf/` | `pdf-lib`（按需加载） |
 | **PDF 合并**（多文件、可排序） | `/pdf/merge-pdf/` | `pdf-lib` `copyPages()` |
 | **PDF 拆分**（页码范围 / 每页一份） | `/pdf/split-pdf/` | `pdf-lib` + 范围解析 |
