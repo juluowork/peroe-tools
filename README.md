@@ -7,6 +7,14 @@
 - 部署：Cloudflare Worker `peroe-tools`（静态资源模式）+ zone 路由 `tools.juluo.work/*`
 - 姊妹项目：博客 `juluowork/fuwari`（<https://blog.peroe.cn>）
 
+## 「为什么不上传」自证页
+
+- `/why-local/`（中文 `/zh/why-local/`）—— 不是营销页，是**教用户自己验证**：
+  4 步 DevTools 操作（F12 → 网络面板 → 丢文件 → 读请求列表），加上「做不到什么」的诚实清单。
+- ⚠️ 站上有**两条**与页面无关的请求：Umami 访问计数 + **Cloudflare RUM 性能测量**（`/cdn-cgi/rum`）。
+  页面文案已如实写明这两条；实测整页外发总量 **1115 字节 / 2 条请求**（最大 841 字节）。
+- 自测：`test-whylocal.mjs` —— 断言「外发字节 < 4KB」「请求体不含文件名/文件内容」，而不是断言「零请求」。
+
 ## PWA（可安装 + 真离线）
 
 - `public/manifest.webmanifest` + 图标（192/512/maskable/apple-touch）+ `public/sw.js`

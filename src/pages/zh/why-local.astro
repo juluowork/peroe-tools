@@ -1,0 +1,248 @@
+---
+import { getSite, getTools, localePath } from "../../i18n";
+import Base from "../../layouts/Base.astro";
+
+const locale = "zh" as const;
+const site = getSite(locale);
+const tools = getTools(locale);
+
+const steps = [
+	{
+		title: "打开网络面板",
+		body: "按 F12（或 Ctrl+Shift+I），切到「网络 / Network」标签页。让它开着 —— 它会记录这个页面发出的每一个请求。",
+	},
+	{
+		title: "把文件丢进任意一个工具",
+		body: "挑一个你平时不太愿意交出去的东西：合同、证件扫描件、聊天截图。打开比如「合并 PDF」或「图片压缩」，把文件拖进去。",
+	},
+	{
+		title: "处理它，然后看那个列表",
+		body: "点按钮、下载结果。看列表里出现的请求：页面本身、样式表、这个工具的脚本、一条统计上报。**你不会看到任何一条请求带着你的文件**。",
+	},
+	{
+		title: "（可选）把网断掉再试一次",
+		body: "关掉 Wi-Fi，再跑一遍 —— 照样能用，因为它本来就不需要网络。全站只有两件事会受影响：还没被缓存过的页面，以及那个访问计数。",
+	},
+];
+
+const hesitate = [
+	["合同与协议", "带着姓名、地址、金额和条款的 PDF，签过或没签过的都算。"],
+	["证件", "身份证、护照、驾照、居住证的照片和扫描件。"],
+	["医疗与保险材料", "体检报告、处方、理赔表单。"],
+	["源码与配置", "可能含密钥、令牌或内网主机名的文件、日志和代码片段。"],
+	["令牌与报文", "JWT、接口返回、连接串 —— 泄露一次就是安全事故的东西。"],
+	["未发布的作品", "设计稿、草稿、未上线产品或内部后台的截图。"],
+];
+
+const cannot = [
+	["OCR 文字识别", "从扫描页里读出文字需要识别模型。我们没有内置，所以扫描件仍然只是一张图。"],
+	["转 Office 格式", "PDF 转 Word / Excel / PPT 需要一套比「页面里能塞下的」重得多的排版引擎。"],
+	["合规电子签名", "这里的签名工具画的是**可见签名**，不是基于证书的数字签名，我们也不声称它是。"],
+	["超大文件", "所有计算都在你的标签页里跑，内存就是上限 —— 几个 GB 的文件在这里跑不动。"],
+];
+
+const jsonLd = [
+	{
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		mainEntity: [
+			{
+				"@type": "Question",
+				name: "怎么确认我的文件没有被上传？",
+				acceptedAnswer: {
+					"@type": "Answer",
+					text: "打开浏览器的网络面板，跑一次工具，看请求列表：只有页面、脚本和一条统计上报，没有任何请求带着你的文件。也可以直接断网再试，工具照样能用。",
+				},
+			},
+			{
+				"@type": "Question",
+				name: "这和那些承诺「用完即删」的网站有什么区别？",
+				acceptedAnswer: {
+					"@type": "Answer",
+					text: "「会删掉」是在描述别人的行为，你无法核实。这里根本没有上传这一步，而这一点你几秒钟就能验证。没有副本，就不存在删除、留存和备份的问题。",
+				},
+			},
+			{
+				"@type": "Question",
+				name: "为什么没有次数限制和账号？",
+				acceptedAnswer: {
+					"@type": "Answer",
+					text: "因为没有服务器在做这件事，处理一个文件对我们的成本是零，也就没有东西需要计量。靠自己的机器做转换的网站，每处理一个文件都要付出成本，所以必须限额、加水印或收费。",
+				},
+			},
+		],
+	},
+];
+
+const t = {
+	title: "为什么这里的文件不会被上传 —— 你可以自己验证",
+	description:
+		"多数工具站要你相信一份「删除政策」。这个站根本没有上传这一步，用浏览器网络面板五秒钟就能确认。下面是验证方法，以及它意味着什么、不意味着什么。",
+};
+---
+
+<Base locale={locale} site={site} tools={tools} title={t.title} description={t.description} path="/why-local/" jsonLd={jsonLd}>
+	<div class="hero">
+		<h1>为什么这里的文件不会被上传</h1>
+		<p class="lead">
+			多数工具站要你相信一句承诺：「文件两小时后自动删除」。而这个站**根本没有上传这一步** ——
+			而且这件事你可以自己验证，大约五秒钟，完全不用听我们说什么。
+		</p>
+	</div>
+
+	<section class="prose">
+		<h2>五秒钟验证</h2>
+		<p>这不是需要你去开启的设置，也不是藏在政策条款里的保证。打开面板、做一次、看列表。</p>
+		<ol class="steps">
+			{steps.map((s) => (
+				<li>
+					<b>{s.title}</b>
+					<p set:html={s.body.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")} />
+				</li>
+			))}
+		</ol>
+		<p class="small muted">
+			有两条请求与页面本身无关：一条访问计数，和 Cloudflare 的性能测量。它们发送的是页面地址与耗时数据 ——
+			不带文件、不带文件名、不带内容，这一点你在同一个面板里看它们实际携带了什么就能确认。
+			它们也是断网后仅有的会失效的东西 —— 这正是区分「统计」和「工具」的办法。
+		</p>
+	</section>
+
+	<section class="prose">
+		<h2>无法核实的承诺 vs 可以核实的架构</h2>
+		<p>
+			「我们一小时后删除你的文件」是一句关于**别人行为**的话。它可能是真的，但它只有他们自己能确认。
+			而一个没有上传接口的架构是**性质上的不同**：没有副本需要删除，没有留存策略需要相信，也没有备份需要你去祈祷。
+		</p>
+		<p>
+			同样的道理适用于 PDF 密码。一个替你加密文档的服务，同时也知道了你设的密码。这里的加密引擎被编译成 WebAssembly
+			在页面内运行，密码只存在于这个标签页里。
+		</p>
+	</section>
+
+	<section class="prose">
+		<h2>人们真正会犹豫的那些文件</h2>
+		<p>下面这些，是「随便传上去吧」开始变得不像好主意的地方：</p>
+		<ul class="plain">
+			{hesitate.map(([h, b]) => (
+				<li>
+					<b>{h}</b> —— {b}
+				</li>
+			))}
+		</ul>
+		<p>
+			它们全都是你不太愿意交给陌生人的文件，而它们需要的往往只是裁一下、打个码、拼起来、加个密码。
+			**内容敏感 + 任务很小**，这个组合就是这个站存在的全部理由。
+		</p>
+	</section>
+
+	<section class="prose">
+		<h2>这个站做不到什么</h2>
+		<p>「在浏览器里运行」是一条真实的约束，不是口号。下面是它排除掉的东西 —— 在你用它替代桌面软件之前，应该先知道：</p>
+		<ul class="plain">
+			{cannot.map(([h, b]) => (
+				<li>
+					<b>{h}</b> —— {b}
+				</li>
+			))}
+		</ul>
+	</section>
+
+	<section class="prose">
+		<h2>为什么没有次数限制、不用注册、也不加水印</h2>
+		<p>
+			这里的每个工具都是静态文件：浏览器下载一次，然后**自己**完成计算。分发静态文件是免费的、不计量的，
+			所以处理你的第 100 个 PDF 和第 1 个一样 —— 成本都是零。没有需要回收的单次成本，自然就不需要限额、大小上限、
+			注册墙，也不需要在结果上盖水印。
+		</p>
+		<p>
+			而靠自己的机器做转换的网站，每处理一个文件都要付出成本。这就是它们必须计量点什么的原因：每日次数、文件大小上限、
+			或者把好一点的导出放在付费档里。差别不在于我们更大方，而在于**计算发生在哪里**。
+		</p>
+	</section>
+
+	<section>
+		<h2>常见疑问</h2>
+		{[
+			{ q: "怎么确认我的文件没有被上传？", a: "打开网络面板跑一次，看请求列表；或者干脆断网再试，照样能用。" },
+			{
+				q: "这和承诺「用完即删」的网站有什么区别？",
+				a: "「会删掉」描述的是别人的行为，无法核实。这里没有上传这一步，几秒钟就能验证。",
+			},
+			{ q: "为什么没有次数限制和账号？", a: "没有服务器在做这件事，处理文件的成本是零，也就没有东西需要计量。" },
+			{
+				q: "那是不是说明工具更弱？",
+				a: "有些活确实是，见上面的清单。但裁剪、打码、合并、拆分、压缩、签名、格式化这些，本地做完全不是降级。",
+			},
+		].map((f) => (
+			<details class="faq">
+				<summary>{f.q}</summary>
+				<p>{f.a}</p>
+			</details>
+		))}
+	</section>
+
+	<section>
+		<div class="section-head">
+			<h2>拿一个你平时不会上传的文件试试</h2>
+			<a class="btn-link" href={localePath(locale, "/tools/")} style="margin-left:auto">
+				{site.navAllTools} →
+			</a>
+		</div>
+		<p class="small muted" style="margin-top:0">
+			共 {tools.length} 个工具，全部本地运行。可以先试 <a href={localePath(locale, "/pdf/merge-pdf/")}>合并 PDF</a>、
+			<a href={localePath(locale, "/image/annotate-image/")}>图片标注与打码</a> 或
+			<a href={localePath(locale, "/dev/jwt-decoder/")}>JWT 解析</a>。
+		</p>
+	</section>
+</Base>
+
+<style>
+	.steps {
+		list-style: none;
+		counter-reset: s;
+		padding: 0;
+		margin: 18px 0;
+		display: grid;
+		gap: 12px;
+	}
+	.steps li {
+		counter-increment: s;
+		position: relative;
+		padding: 14px 16px 14px 56px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
+		background: var(--soft);
+	}
+	.steps li::before {
+		content: counter(s);
+		position: absolute;
+		left: 16px;
+		top: 14px;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background: var(--brand);
+		color: #fff;
+		font-weight: 700;
+		font-size: 14px;
+		display: grid;
+		place-items: center;
+	}
+	.steps li p {
+		margin: 6px 0 0;
+		color: var(--muted);
+	}
+	.plain {
+		margin: 16px 0;
+		padding-left: 20px;
+		display: grid;
+		gap: 8px;
+	}
+	.plain li {
+		color: var(--muted);
+	}
+	.plain b {
+		color: var(--fg);
+	}
+</style>

@@ -1,0 +1,267 @@
+---
+import { getSite, getTools, localePath } from "../i18n";
+import Base from "../layouts/Base.astro";
+
+const locale = "en" as const;
+const site = getSite(locale);
+const tools = getTools(locale);
+const origin = "https://tools.juluo.work";
+
+const steps = [
+	{
+		n: 1,
+		title: "Open the network panel",
+		body: "Press F12 (or Ctrl+Shift+I), then click the Network tab. Leave it open — it records every request the page makes.",
+	},
+	{
+		n: 2,
+		title: "Drop a file into any tool",
+		body: "Pick something you would not want to hand over: a contract, an ID scan, a screenshot of a chat. Choose a tool such as Merge PDF or Compress Image and drop the file in.",
+	},
+	{
+		n: 3,
+		title: "Process it and watch the list",
+		body: "Run the tool and download the result. Look at the requests that appear: you will see the page, the stylesheet, the tool's own script, the analytics ping. What you will not see is a request carrying your file.",
+	},
+	{
+		n: 4,
+		title: "Optional: pull the plug",
+		body: "Turn off Wi-Fi and run the tool again. It still works — because it never needed the network in the first place. Only a handful of things on this site would notice: the page itself if it is not cached yet, and the visit counter.",
+	},
+];
+
+const hesitate = [
+	["Contracts and agreements", "Signed and unsigned PDFs that carry names, addresses, salaries and terms."],
+	["ID documents", "Scans and photos of ID cards, passports, driving licences, residence permits."],
+	["Medical and insurance paperwork", "Reports, prescriptions, claim forms."],
+	["Source code and configuration", "Files, logs and snippets that may contain keys, tokens or internal hostnames."],
+	["Tokens and payloads", "JWTs, API responses, connection strings — the things that are a security incident if they leak."],
+	["Unreleased work", "Designs, drafts, screenshots of an unreleased product or an internal dashboard."],
+];
+
+const cannot = [
+	["OCR", "Reading text out of a scanned page needs a recognition model. We do not ship one, so a scan stays an image."],
+	["Office conversion", "PDF to Word, Excel or PowerPoint needs a layout engine far heavier than anything that belongs in a page."],
+	["Qualified electronic signatures", "The signature tool here draws a visible signature. It is not a certificate-backed digital signature and does not claim to be."],
+	["Very large files", "Everything runs in your tab, so memory is the limit — a multi-gigabyte file will not work here."],
+];
+
+const jsonLd = [
+	{
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		mainEntity: [
+			{
+				"@type": "Question",
+				name: "How can I be sure my file is not uploaded?",
+				acceptedAnswer: {
+					"@type": "Answer",
+					text: "Open the browser's network panel, run the tool, and read the list of requests. The page, its scripts and an analytics ping appear; no request carries your file. You can also disconnect from the network entirely and the tool still works.",
+				},
+			},
+			{
+				"@type": "Question",
+				name: "What is the difference between this and a site that promises to delete files?",
+				acceptedAnswer: {
+					"@type": "Answer",
+					text: "A deletion promise is a statement about someone else's behaviour that you cannot check. Here there is no upload step at all, which you can verify in a few seconds. Nothing to delete means nothing to leak.",
+				},
+			},
+			{
+				"@type": "Question",
+				name: "Why are there no limits or accounts?",
+				acceptedAnswer: {
+					"@type": "Answer",
+					text: "Because no server does the work, processing a file costs us nothing, so there is nothing to meter. Sites that run conversions on their own machines pay for every file and must limit, watermark or charge for them.",
+				},
+			},
+		],
+	},
+];
+
+const t = {
+	title: "Why nothing you drop here is uploaded — verify it yourself",
+	description:
+		"Most tool sites ask you to trust a deletion policy. This one has no upload step at all, which you can confirm in five seconds with the browser's network panel. Here is how, and what it does and does not mean.",
+};
+---
+
+<Base locale={locale} site={site} tools={tools} title={t.title} description={t.description} path="/why-local/" jsonLd={jsonLd}>
+	<div class="hero">
+		<h1>Why nothing you drop here is uploaded</h1>
+		<p class="lead">
+			Most tool sites ask you to trust a promise: “your file is deleted after two hours”. This site has no upload step to begin
+			with — and that is something you can check yourself, in about five seconds, without taking our word for anything.
+		</p>
+	</div>
+
+	<section class="prose">
+		<h2>Verify it in five seconds</h2>
+		<p>
+			This is not a setting you have to enable or a guarantee buried in a policy. Open the panel, do the thing, read the list.
+		</p>
+		<ol class="steps">
+			{steps.map((s) => (
+				<li>
+					<b>{s.title}</b>
+					<p>{s.body}</p>
+				</li>
+			))}
+		</ol>
+		<p class="small muted">
+			Two requests are not about the page itself: a visit counter and Cloudflare's performance measurement. Both send the page
+			address and timing data — no file, no filename, no contents, which you can confirm in the same panel by looking at what they
+			actually carry. They are also the only things that stop working when you go offline, which is how you can tell them apart
+			from the tools.
+		</p>
+	</section>
+
+	<section class="prose">
+		<h2>A promise you cannot check, versus an architecture you can</h2>
+		<p>
+			“We delete your files after an hour” is a sentence about someone else's behaviour. It may well be true, and it is still
+			something only they can confirm. An architecture with no upload endpoint is different in kind: there is no copy to delete,
+			no retention policy to trust, and no backup you have to hope about.
+		</p>
+		<p>
+			The same reasoning applies to the password on a PDF. A service that encrypts your document also learns the password you chose
+			for it. Here the encryption engine is compiled to WebAssembly and runs inside the page, so the password exists only in this tab.
+		</p>
+	</section>
+
+	<section class="prose">
+		<h2>The files people actually hesitate over</h2>
+		<p>These are the documents where “just upload it somewhere” stops feeling like a good idea:</p>
+		<ul class="plain">
+			{hesitate.map(([h, b]) => (
+				<li>
+					<b>{h}</b> — {b}
+				</li>
+			))}
+		</ul>
+		<p>
+			Every one of them is a file you would be uneasy handing to a stranger, and most of them need nothing more than a crop, a
+			redaction, a merge or a password. That combination — sensitive content, small task — is the whole reason this site exists.
+		</p>
+	</section>
+
+	<section class="prose">
+		<h2>What this site cannot do</h2>
+		<p>
+			Running in the browser is a real constraint, not a slogan. These are the things it rules out, and you should know them
+			before you rely on this instead of a desktop application:
+		</p>
+		<ul class="plain">
+			{cannot.map(([h, b]) => (
+				<li>
+					<b>{h}</b> — {b}
+				</li>
+			))}
+		</ul>
+	</section>
+
+	<section class="prose">
+		<h2>Why there are no limits, no accounts and no watermarks</h2>
+		<p>
+			Every tool here is a static file: the browser downloads it once and does the work itself. Serving a static file is free and
+			unmetered, so processing your hundredth PDF costs exactly as much as the first — nothing. There is no per-file cost to
+			recover, which is why there is no quota, no size cap, no sign-up wall and no watermark on the result.
+		</p>
+		<p>
+			Sites that convert on their own machines pay for every file they process. That is why they must meter something: a daily
+			limit, a file-size ceiling, a premium tier for the good export. The difference is not generosity on our side — it is where
+			the computation happens.
+		</p>
+	</section>
+
+	<section>
+		<h2>Questions people ask</h2>
+		{[
+			{
+				q: "How can I be sure my file is not uploaded?",
+				a: "Open the network panel, run the tool, read the list. Or simply disconnect and try again — it still works.",
+			},
+			{
+				q: "What is the difference from a site that promises to delete files?",
+				a: "A deletion promise describes someone else's behaviour and cannot be checked. There is no upload step here, which you can check in seconds.",
+			},
+			{
+				q: "Why are there no limits or accounts?",
+				a: "No server does the work, so a file costs us nothing to process and there is nothing to meter.",
+			},
+			{
+				q: "Does that mean the tools are less capable?",
+				a: "For some jobs, yes — see the list above. For cropping, redacting, merging, splitting, compressing, signing and formatting, doing it locally is not a downgrade at all.",
+			},
+		].map((f) => (
+			<details class="faq">
+				<summary>{f.q}</summary>
+				<p>{f.a}</p>
+			</details>
+		))}
+	</section>
+
+	<section>
+		<div class="section-head">
+			<h2>Try it on something you would not normally upload</h2>
+			<a class="btn-link" href={localePath(locale, "/tools/")} style="margin-left:auto">
+				{site.navAllTools} →
+			</a>
+		</div>
+		<p class="small muted" style="margin-top:0">
+			{tools.length} tools, all local. Start with <a href={localePath(locale, "/pdf/merge-pdf/")}>Merge PDF</a>,
+			<a href={localePath(locale, "/image/annotate-image/")}>Annotate &amp; redact</a> or
+			<a href={localePath(locale, "/dev/jwt-decoder/")}>JWT decoder</a>.
+		</p>
+	</section>
+</Base>
+
+<style>
+	.steps {
+		list-style: none;
+		counter-reset: s;
+		padding: 0;
+		margin: 18px 0;
+		display: grid;
+		gap: 12px;
+	}
+	.steps li {
+		counter-increment: s;
+		position: relative;
+		padding: 14px 16px 14px 56px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
+		background: var(--soft);
+	}
+	.steps li::before {
+		content: counter(s);
+		position: absolute;
+		left: 16px;
+		top: 14px;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background: var(--brand);
+		color: #fff;
+		font-weight: 700;
+		font-size: 14px;
+		display: grid;
+		place-items: center;
+	}
+	.steps li p {
+		margin: 6px 0 0;
+		color: var(--muted);
+	}
+	.plain {
+		margin: 16px 0;
+		padding-left: 20px;
+		display: grid;
+		gap: 8px;
+	}
+	.plain li {
+		color: var(--muted);
+	}
+	.plain b {
+		color: var(--fg);
+	}
+</style>

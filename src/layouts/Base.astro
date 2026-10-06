@@ -82,6 +82,7 @@ const alt = origin + localePath(locale === "en" ? "zh" : "en", path);
 				<span>{site.footerNote}</span>
 				<span class="footer-links">
 					<a href={localePath(locale, "/tools/")}>{site.navAllTools}</a>
+					<a href={localePath(locale, "/why-local/")}>{locale === "en" ? "Why nothing is uploaded" : "为什么不上传"}</a>
 					{site.footerLinks.map((l) => <a href={l.href}>{l.label}</a>)}
 					<a href={`mailto:${site.email}`} title={site.contactLabel}>
 						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" style="vertical-align:-2px;margin-right:4px">
