@@ -1,0 +1,7 @@
+# Cloudflare Workers 静态资源的 _redirects 规则（比 meta-refresh 更规范）
+/en/  /  301
+/en  /  301
+/en/compress-image/  /compress-image/  301
+/en/convert-image/  /convert-image/  301
+/en/resize-image/  /resize-image/  301
+/en/image-to-pdf/  /image-to-pdf/  301
