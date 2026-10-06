@@ -87,6 +87,7 @@ const TOOL_ICONS: Record<string, string> = {
 	"annotate-image": "pen",
 	"crop-image": "crop",
 	"stitch-image": "merge",
+	"tile-image": "pages",
 	"image-to-ico": "image",
 	"exif-viewer": "image",
 	"heic-to-jpg": "convert",

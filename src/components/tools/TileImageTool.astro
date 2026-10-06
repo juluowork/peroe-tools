@@ -1,0 +1,222 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="image/*" hidden />
+
+	<div id="editor" hidden>
+		<div class="options">
+			<label class="field"><span class="lbl">{ui.preset}</span>
+				<select id="preset">
+					<option value="3x3">{ui.p33}</option>
+					<option value="2x2">{ui.p22}</option>
+					<option value="3x1">{ui.p31}</option>
+					<option value="1x3">{ui.p13}</option>
+					<option value="4x4">{ui.p44}</option>
+					<option value="custom">{ui.pCustom}</option>
+				</select>
+			</label>
+			<label class="field" id="customBox" hidden><span class="lbl">{ui.cols} × {ui.rows}</span>
+				<span style="display:inline-flex;gap:6px;align-items:center">
+					<input id="cols" type="number" min="1" max="8" value="3" style="width:64px" />
+					<input id="rows" type="number" min="1" max="8" value="3" style="width:64px" />
+				</span>
+			</label>
+			<label class="field"><span class="lbl">{ui.border} <b id="bv">0</b>px</span>
+				<input id="border" type="range" min="0" max="60" value="0" />
+			</label>
+			<label class="field"><span class="lbl">{ui.borderColor}</span>
+				<select id="bcolor">
+					<option value="#ffffff">White</option>
+					<option value="#000000">Black</option>
+					<option value="transparent">{ui.transparent}</option>
+				</select>
+			</label>
+			<label class="field"><span class="lbl">{ui.format}</span>
+				<select id="format">
+					<option value="image/png">PNG</option>
+					<option value="image/jpeg">JPG</option>
+				</select>
+			</label>
+		</div>
+
+		<div class="btns">
+			<button class="btn-primary" id="run">{ui.run}</button>
+			<button class="btn-ghost" id="zip" hidden>{ui.downloadZip}</button>
+			<button class="btn-link" id="reset">{ui.startOver}</button>
+		</div>
+		<p class="empty" id="status"></p>
+		<div class="pagetile" id="grid" style="margin-top:14px"></div>
+	</div>
+</div>
+
+<style>
+	.options {
+		display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+		padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--soft);
+	}
+	.field { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+	#grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+	.tile { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+	.tile img { display: block; width: 100%; height: auto; background: repeating-conic-gradient(#eef2f7 0% 25%, #fff 0% 50%) 50% / 16px 16px; }
+	.tile a { display: block; padding: 6px 8px; font-size: 12px; text-align: center; border-top: 1px solid var(--line); color: var(--brand-dark); text-decoration: none; }
+	.tile a:hover { background: var(--brand-weak); }
+</style>
+
+<script>
+	import { zipSync } from "fflate";
+	import { bindDropZone, clearBusy, download, escapeHtml, loadImage, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+	const editor = document.getElementById("editor")!;
+	const status = document.getElementById("status")!;
+	const grid = document.getElementById("grid")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const zipBtn = document.getElementById("zip") as HTMLButtonElement;
+	const presetSel = document.getElementById("preset") as HTMLSelectElement;
+	const customBox = document.getElementById("customBox")!;
+	const colsIn = document.getElementById("cols") as HTMLInputElement;
+	const rowsIn = document.getElementById("rows") as HTMLInputElement;
+	const borderIn = document.getElementById("border") as HTMLInputElement;
+	const bv = document.getElementById("bv")!;
+	borderIn.addEventListener("input", () => (bv.textContent = borderIn.value));
+
+	presetSel.addEventListener("change", () => {
+		customBox.hidden = presetSel.value !== "custom";
+	});
+
+	let src: HTMLCanvasElement | null = null;
+	let srcName = "image";
+	let tiles: { name: string; blob: Blob }[] = [];
+
+	function dims() {
+		if (presetSel.value === "custom") {
+			return {
+				cols: Math.min(8, Math.max(1, Number(colsIn.value) || 3)),
+				rows: Math.min(8, Math.max(1, Number(rowsIn.value) || 3)),
+			};
+		}
+		const [c, r] = presetSel.value.split("x").map(Number);
+		return { cols: c, rows: r };
+	}
+
+	bindDropZone(dz, fileIn, async (picked) => {
+		const f = picked.find((x) => x.type.startsWith("image/"));
+		if (!f) return;
+		srcName = f.name.replace(/\.[^.]+$/, "") || "image";
+		const img = await loadImage(f);
+		const c = document.createElement("canvas");
+		c.width = img.width;
+		c.height = img.height;
+		c.getContext("2d")!.drawImage(img.bitmap, 0, 0);
+		img.bitmap.close();
+		src = c;
+		tiles = [];
+		grid.innerHTML = "";
+		zipBtn.hidden = true;
+		status.textContent = "";
+		dz.hidden = true;
+		editor.hidden = false;
+	});
+
+	zipBtn.addEventListener("click", () => {
+		if (!tiles.length) return;
+		status.textContent = ui.zipping;
+		// 逐个转成字节再交给 fflate（它的 zipSync 是同步的，几十张小图毫秒级完成）
+		Promise.all(tiles.map(async (t) => [t.name, new Uint8Array(await t.blob.arrayBuffer())] as const)).then((entries) => {
+			const zip = zipSync(Object.fromEntries(entries), { level: 0 });
+			download(new Blob([zip as BlobPart], { type: "application/zip" }), `${srcName}-${tiles.length}tiles.zip`);
+			status.innerHTML = `${ui.done} · ${tiles.length} ${ui.tiles} → zip`;
+		});
+	});
+
+	runBtn.addEventListener("click", async () => {
+		if (!src) return;
+		setBusy(runBtn, ui.working);
+		status.textContent = "";
+		grid.innerHTML = "";
+		tiles = [];
+		zipBtn.hidden = true;
+		try {
+			const { cols, rows } = dims();
+			const b = Number(borderIn.value);
+			const bcol = (document.getElementById("bcolor") as HTMLSelectElement).value;
+			const mime = (document.getElementById("format") as HTMLSelectElement).value;
+			const ext = mime === "image/jpeg" ? "jpg" : "png";
+
+			// 瓦片尺寸向下取整，余下的像素补给最后一行/列 —— 保证不丢内容
+			const tw = Math.floor(src.width / cols);
+			const th = Math.floor(src.height / rows);
+			if (tw < 8 || th < 8) throw new Error(ui.tooMany);
+
+			for (let r = 0; r < rows; r++) {
+				for (let c = 0; c < cols; c++) {
+					const x = c * tw;
+					const y = r * th;
+					const w = c === cols - 1 ? src.width - x : tw;
+					const h = r === rows - 1 ? src.height - y : th;
+					const out = document.createElement("canvas");
+					out.width = w + b * 2;
+					out.height = h + b * 2;
+					const g = out.getContext("2d")!;
+					if (bcol !== "transparent") {
+						g.fillStyle = bcol;
+						g.fillRect(0, 0, out.width, out.height);
+					}
+					g.drawImage(src, x, y, w, h, b, b, w, h);
+					const blob: Blob = await new Promise((res, rej) =>
+						out.toBlob((x2) => (x2 ? res(x2) : rej(new Error("export failed"))), mime, 0.94),
+					);
+					const name = `${srcName}-${r + 1}-${c + 1}.${ext}`;
+					tiles.push({ name, blob });
+
+					const cell = document.createElement("div");
+					cell.className = "tile";
+					const im = document.createElement("img");
+					im.src = out.toDataURL("image/jpeg", 0.7);
+					im.alt = name;
+					const link = document.createElement("a");
+					link.href = "#";
+					link.textContent = `${r + 1}-${c + 1} · ${out.width}×${out.height}`;
+					link.addEventListener("click", (e) => {
+						e.preventDefault();
+						download(blob, name);
+					});
+					cell.append(im, link);
+					grid.appendChild(cell);
+				}
+			}
+			zipBtn.hidden = false;
+			const first = grid.querySelector(".tile a")?.textContent ?? "";
+			status.innerHTML = `${ui.done} · <b>${tiles.length}</b> ${ui.tiles} · ${first} px`;
+		} catch (err) {
+			status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+		clearBusy(runBtn);
+	});
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		src = null;
+		tiles = [];
+		grid.innerHTML = "";
+		editor.hidden = true;
+		dz.hidden = false;
+		dz.classList.remove("is-compact");
+		status.textContent = "";
+		zipBtn.hidden = true;
+		fileIn.value = "";
+	});
+</script>
