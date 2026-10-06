@@ -1,0 +1,168 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="options" style="align-items:flex-end">
+		<label class="field" style="flex:1 1 320px"><span class="lbl">{ui.input}</span>
+			<input id="input" type="text" value="#00bb88" spellcheck="false" placeholder="#00bb88 / rgb(0,187,136) / hsl(164,100%,37%)" />
+		</label>
+		<label class="field" style="flex:0 0 auto"><span class="lbl">{ui.picker}</span>
+			<input id="picker" type="color" value="#00bb88" style="width:56px;height:38px;padding:2px" />
+		</label>
+	</div>
+
+	<div id="swatch" style="height:96px;border-radius:var(--radius-card);border:1px solid var(--line);margin:14px 0"></div>
+	<p class="empty" id="status"></p>
+	<div id="out" hidden></div>
+</div>
+
+<script>
+	import { bindCopy } from "../../lib/devtools.client";
+	import { escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const input = document.getElementById("input") as HTMLInputElement;
+	const picker = document.getElementById("picker") as HTMLInputElement;
+	const swatch = document.getElementById("swatch")!;
+	const status = document.getElementById("status")!;
+	const out = document.getElementById("out")!;
+
+	const clamp = (n: number, lo = 0, hi = 255) => Math.min(hi, Math.max(lo, n));
+	const round = (n: number, d = 1) => Number(n.toFixed(d));
+
+	function parseColor(raw: string): { r: number; g: number; b: number; a: number } | null {
+		const s = raw.trim().toLowerCase();
+		// #rgb / #rgba / #rrggbb / #rrggbbaa
+		let m = /^#?([0-9a-f]{3,8})$/.exec(s);
+		if (m) {
+			let h = m[1];
+			if (h.length === 3 || h.length === 4) h = h.split("").map((c) => c + c).join("");
+			if (h.length === 6 || h.length === 8) {
+				return {
+					r: parseInt(h.slice(0, 2), 16),
+					g: parseInt(h.slice(2, 4), 16),
+					b: parseInt(h.slice(4, 6), 16),
+					a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1,
+				};
+			}
+		}
+		// rgb() / rgba()
+		m = /^rgba?\(\s*([\d.]+%?)[\s,]+([\d.]+%?)[\s,]+([\d.]+%?)(?:[\s,/]+([\d.]+%?))?\s*\)$/.exec(s);
+		if (m) {
+			const chan = (v: string) => (v.endsWith("%") ? (parseFloat(v) / 100) * 255 : parseFloat(v));
+			const alpha = m[4] === undefined ? 1 : m[4].endsWith("%") ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+			return { r: clamp(chan(m[1])), g: clamp(chan(m[2])), b: clamp(chan(m[3])), a: clamp(alpha, 0, 1) };
+		}
+		// hsl() / hsla()
+		m = /^hsla?\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%(?:[\s,/]+([\d.]+)%?)?\s*\)$/.exec(s);
+		if (m) {
+			const h = ((parseFloat(m[1]) % 360) + 360) % 360;
+			const sat = parseFloat(m[2]) / 100;
+			const lig = parseFloat(m[3]) / 100;
+			const a = m[4] === undefined ? 1 : m[4].endsWith("%") ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+			const c = (1 - Math.abs(2 * lig - 1)) * sat;
+			const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+			const mm = lig - c / 2;
+			const seg = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+			return { r: clamp(Math.round((seg[0] + mm) * 255)), g: clamp(Math.round((seg[1] + mm) * 255)), b: clamp(Math.round((seg[2] + mm) * 255)), a: clamp(a, 0, 1) };
+		}
+		return null;
+	}
+
+	function toHsl(r: number, g: number, b: number) {
+		const rr = r / 255;
+		const gg = g / 255;
+		const bb = b / 255;
+		const max = Math.max(rr, gg, bb);
+		const min = Math.min(rr, gg, bb);
+		const l = (max + min) / 2;
+		let h = 0;
+		let s = 0;
+		if (max !== min) {
+			const d = max - min;
+			s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+			h = max === rr ? (gg - bb) / d + (gg < bb ? 6 : 0) : max === gg ? (bb - rr) / d + 2 : (rr - gg) / d + 4;
+			h *= 60;
+		}
+		return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+	}
+
+	function luminance(r: number, g: number, b: number) {
+		const f = (v: number) => {
+			const x = v / 255;
+			return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+		};
+		return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+	}
+
+	function contrast(l1: number, l2: number) {
+		const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+		return (hi + 0.05) / (lo + 0.05);
+	}
+
+	function run() {
+		const rgb = parseColor(input.value);
+		if (!rgb) {
+			status.innerHTML = `<span class="note-warn">${ui.bad}</span>`;
+			out.hidden = true;
+			swatch.style.background = "transparent";
+			return;
+		}
+		const { r, g, b, a } = rgb;
+		const hex = `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+		const hexA = a < 1 ? `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}` : hex;
+		const hsl = toHsl(r, g, b);
+		const css = a < 1 ? `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${round(a, 2)})` : `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+		const lum = luminance(r, g, b);
+		const onWhite = contrast(lum, 1);
+		const onBlack = contrast(lum, 0);
+		const wcag = (ratio: number, large: boolean) => (ratio >= (large ? 3 : 4.5) ? ui.pass : ui.fail);
+		const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+
+		picker.value = hex;
+		swatch.style.background = css;
+		const rows: [string, string][] = [
+			["HEX", hex],
+			[ui.withAlpha, hexA],
+			["RGB", css],
+			["HSL", `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`],
+			[ui.hslParts, `H ${hsl.h}° · S ${hsl.s}% · L ${hsl.l}%`],
+			[ui.relativeLum, round(lum, 3).toString()],
+			[ui.contrastWhite, `${round(onWhite, 2)}:1 · ${wcag(onWhite, false)} (AA) / ${wcag(onWhite, true)} (AA large)`],
+			[ui.contrastBlack, `${round(onBlack, 2)}:1 · ${wcag(onBlack, false)} (AA) / ${wcag(onBlack, true)} (AA large)`],
+			[ui.bestText, yiq >= 128 ? i18nBlack(ui) : i18nWhite(ui)],
+		];
+		out.innerHTML = `<div class="card">${rows
+			.map(
+				([k, v]) =>
+					`<div class="hashrow"><span class="algo" style="flex-basis:170px">${escapeHtml(k)}</span><code style="user-select:all">${escapeHtml(v)}</code><button class="btn-ghost" data-v="${escapeHtml(v.split(" · ")[0])}">${ui.copy}</button></div>`,
+			)
+			.join("")}</div>`;
+		out.hidden = false;
+		out.querySelectorAll<HTMLButtonElement>("button[data-v]").forEach((btn) =>
+			bindCopy(btn, () => btn.dataset.v || "", ui.copied, ui.copy),
+		);
+		status.innerHTML = `${ui.done}`;
+	}
+	function i18nBlack(_ui: Record<string, string>) {
+		return ui.blackText;
+	}
+	function i18nWhite(_ui: Record<string, string>) {
+		return ui.whiteText;
+	}
+
+	input.addEventListener("input", run);
+	picker.addEventListener("input", () => {
+	input.value = picker.value;
+	run();
+});
+	run();
+</script>

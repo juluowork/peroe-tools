@@ -1,0 +1,133 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="iogrid" style="grid-template-columns:1fr">
+		<div>
+			<span class="label">{ui.input}</span>
+			<textarea id="input" spellcheck="false" style="min-height:120px" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"></textarea>
+		</div>
+	</div>
+	<div class="btns">
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="sample">{ui.sample}</button>
+		<button class="btn-link" id="clear">{ui.clear}</button>
+	</div>
+	<p class="empty" id="status"></p>
+	<div id="out" hidden></div>
+</div>
+
+<script>
+	import { bindCopy } from "../../lib/devtools.client";
+	import { escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const input = document.getElementById("input") as HTMLTextAreaElement;
+	const status = document.getElementById("status")!;
+	const out = document.getElementById("out")!;
+
+	const CLAIMS: Record<string, string> = {
+		iss: ui.cIss, sub: ui.cSub, aud: ui.cAud, exp: ui.cExp, nbf: ui.cNbf, iat: ui.cIat, jti: ui.cJti,
+		name: ui.cName, email: ui.cEmail, scope: ui.cScope, role: ui.cRole, azp: ui.cAzp, client_id: ui.cClientId,
+	};
+	const TIME_CLAIMS = new Set(["exp", "nbf", "iat", "auth_time", "updated_at"]);
+
+	function b64urlToText(seg: string): string {
+		let s = seg.replace(/-/g, "+").replace(/_/g, "/");
+		while (s.length % 4) s += "=";
+		const bin = atob(s);
+		const bytes = new Uint8Array(bin.length);
+		for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+		return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+
+	function fmtTime(v: unknown): string {
+		const n = typeof v === "number" ? v : Number(v);
+		if (!Number.isFinite(n)) return String(v);
+		const d = new Date(n * 1000);
+		const rel = Math.round((d.getTime() - Date.now()) / 1000);
+		const abs = Math.abs(rel);
+		const unit = abs < 60 ? [abs, ui.uSecond] : abs < 3600 ? [Math.round(abs / 60), ui.uMinute] : abs < 86400 ? [Math.round(abs / 3600), ui.uHour] : [Math.round(abs / 86400), ui.uDay];
+		return `${d.toLocaleString()} (${rel < 0 ? `${unit[0]} ${unit[1]} ${ui.ago}` : `${unit[0]} ${unit[1]} ${ui.later}`})`;
+}
+
+	function panel(title: string, json: unknown, raw: string) {
+		const rows = Object.entries(json as Record<string, unknown>)
+			.map(([k, v]) => {
+				const label = CLAIMS[k] ? `${k} · ${CLAIMS[k]}` : k;
+				let value = TIME_CLAIMS.has(k) ? fmtTime(v) : typeof v === "object" ? JSON.stringify(v) : String(v);
+				if (k === "exp") {
+					const expired = Number(v) * 1000 < Date.now();
+					value = `${value} ${expired ? ui.expired : ui.valid}`;
+				}
+				return `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`;
+			})
+			.join("");
+		return `<section>
+			<div class="cat-block-head"><h2>${escapeHtml(title)}</h2><button class="btn-ghost" data-copy="${escapeHtml(JSON.stringify(json, null, 2))}">${ui.copy}</button></div>
+			<pre style="margin:10px 0 0;padding:12px 14px;background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-card);font:12.5px/1.6 ui-monospace,Consolas,monospace;overflow:auto">${escapeHtml(JSON.stringify(json, null, 2))}</pre>
+			<table class="exif" style="margin-top:10px">${rows}</table>
+			<p class="small muted" style="margin:6px 0 0">${ui.raw}: <code style="word-break:break-all">${escapeHtml(raw.slice(0, 80))}${raw.length > 80 ? "…" : ""}</code></p>
+		</section>`;
+}
+
+	function run() {
+	const token = input.value.trim().replace(/^Bearer\s+/i, "");
+	if (!token) {
+		status.innerHTML = `<span class="note-warn">${ui.empty}</span>`;
+		return;
+	}
+	const parts = token.split(".");
+	if (parts.length < 2) {
+		status.innerHTML = `<span class="note-warn">${ui.notJwt}</span>`;
+		out.hidden = true;
+		return;
+	}
+	try {
+		const header = JSON.parse(b64urlToText(parts[0]));
+		const payload = JSON.parse(b64urlToText(parts[1]));
+		const sig = parts[2] || "";
+		out.innerHTML =
+			panel(ui.header, header, parts[0]) +
+			panel(ui.payload, payload, parts[1]) +
+			`<section><div class="cat-block-head"><h2>${ui.signature}</h2></div>
+			<p class="small muted" style="margin:4px 0 0">${ui.sigNote}</p>
+			<pre style="margin:10px 0 0;padding:12px 14px;background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-card);font:12.5px/1.6 ui-monospace,Consolas,monospace;word-break:break-all;white-space:pre-wrap">${escapeHtml(sig || "—")}</pre></section>`;
+		out.hidden = false;
+		out.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach((b) =>
+			bindCopy(b, () => b.dataset.copy || "", ui.copied, ui.copy),
+		);
+		const alg = (header as Record<string, unknown>).alg ?? "?";
+		status.innerHTML = `${ui.done} · alg=${escapeHtml(String(alg))} · ${parts.length === 3 ? ui.hasSig : ui.noSig}`;
+	} catch (err) {
+		out.hidden = true;
+		status.innerHTML = `<span class="note-warn">${ui.bad}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+}
+
+	document.getElementById("run")!.addEventListener("click", run);
+	document.getElementById("sample")!.addEventListener("click", () => {
+	input.value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+	run();
+});
+	document.getElementById("clear")!.addEventListener("click", () => {
+	input.value = "";
+	out.hidden = true;
+	status.textContent = "";
+});
+	let timer: number | undefined;
+	input.addEventListener("input", () => {
+	window.clearTimeout(timer);
+	timer = window.setTimeout(() => {
+		if (input.value.trim()) run();
+	}, 350);
+});
+</script>

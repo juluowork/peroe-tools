@@ -23,6 +23,10 @@ import UrlTool from "../../../components/tools/UrlTool.astro";
 import HashTool from "../../../components/tools/HashTool.astro";
 import UuidTool from "../../../components/tools/UuidTool.astro";
 import TimestampTool from "../../../components/tools/TimestampTool.astro";
+import RegexTool from "../../../components/tools/RegexTool.astro";
+import JwtTool from "../../../components/tools/JwtTool.astro";
+import DiffTool from "../../../components/tools/DiffTool.astro";
+import ColorTool from "../../../components/tools/ColorTool.astro";
 import { getSite, getTools } from "../../../i18n";
 import type { ToolCopy } from "../../../i18n";
 
@@ -60,6 +64,10 @@ const components: Record<string, typeof CompressTool> = {
 	"hash-generator": HashTool,
 	"uuid-generator": UuidTool,
 	"timestamp": TimestampTool,
+	"regex-tester": RegexTool,
+	"jwt-decoder": JwtTool,
+	"text-diff": DiffTool,
+	"color-converter": ColorTool,
 };
 const Tool = components[tool.slug];
 ---

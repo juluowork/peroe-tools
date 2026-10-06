@@ -1,0 +1,185 @@
+---
+import type { ToolCopy } from "../../i18n";
+
+interface Props {
+	ui: ToolCopy["ui"];
+}
+const { ui } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<div class="options">
+		<label class="field"><span class="lbl">{ui.ignoreCase}</span>
+			<select id="ignoreCase">
+				<option value="0">{ui.off}</option>
+				<option value="1">{ui.on}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.ignoreWhitespace}</span>
+			<select id="trim">
+				<option value="0">{ui.off}</option>
+				<option value="1">{ui.on}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.view}</span>
+			<select id="view">
+				<option value="unified">{ui.viewUnified}</option>
+				<option value="side">{ui.viewSide}</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="iogrid">
+		<div>
+			<span class="label">{ui.left}</span>
+			<textarea id="left" spellcheck="false" placeholder="line one&#10;line two"></textarea>
+		</div>
+		<div>
+			<span class="label">{ui.right}</span>
+			<textarea id="right" spellcheck="false" placeholder="line one&#10;line 2"></textarea>
+		</div>
+	</div>
+
+	<div class="btns">
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="swap">{ui.swap}</button>
+		<button class="btn-ghost" id="copy">{ui.copy}</button>
+		<button class="btn-link" id="clear">{ui.clear}</button>
+	</div>
+	<p class="empty" id="status"></p>
+	<div id="out" hidden style="margin-top:14px"></div>
+</div>
+
+<script>
+	import { bindCopy } from "../../lib/devtools.client";
+	import { escapeHtml } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const left = document.getElementById("left") as HTMLTextAreaElement;
+	const right = document.getElementById("right") as HTMLTextAreaElement;
+	const status = document.getElementById("status")!;
+	const out = document.getElementById("out")!;
+	let plain = "";
+
+	/** 经典 LCS 行差异；行数很大时退化为"逐行比对"，避免 O(n·m) 卡死 */
+	function diffLines(a: string[], b: string[]): { type: "same" | "add" | "del"; text: string }[] {
+		const n = a.length;
+		const m = b.length;
+		if (n * m > 4_000_000) {
+			const outLines: { type: "same" | "add" | "del"; text: string }[] = [];
+			for (let i = 0; i < Math.max(n, m); i++) {
+				if (i >= n) outLines.push({ type: "add", text: b[i] });
+				else if (i >= m) outLines.push({ type: "del", text: a[i] });
+				else if (a[i] === b[i]) outLines.push({ type: "same", text: a[i] });
+				else {
+					outLines.push({ type: "del", text: a[i] });
+					outLines.push({ type: "add", text: b[i] });
+				}
+			}
+			return outLines;
+		}
+		// dp[i][j] = LCS 长度
+		const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+		for (let i = n - 1; i >= 0; i--) {
+			for (let j = m - 1; j >= 0; j--) {
+				dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+			}
+		}
+		const res: { type: "same" | "add" | "del"; text: string }[] = [];
+		let i = 0;
+		let j = 0;
+		while (i < n && j < m) {
+			if (a[i] === b[j]) {
+				res.push({ type: "same", text: a[i] });
+				i++;
+				j++;
+			} else if (dp[i + 1][j] >= dp[i][j + 1]) {
+				res.push({ type: "del", text: a[i++] });
+			} else {
+				res.push({ type: "add", text: b[j++] });
+			}
+		}
+		while (i < n) res.push({ type: "del", text: a[i++] });
+		while (j < m) res.push({ type: "add", text: b[j++] });
+		return res;
+	}
+
+	function run() {
+		const ignoreCase = (document.getElementById("ignoreCase") as HTMLSelectElement).value === "1";
+		const trim = (document.getElementById("trim") as HTMLSelectElement).value === "1";
+		const view = (document.getElementById("view") as HTMLSelectElement).value;
+		const norm = (s: string) => {
+			let x = s.replace(/\r\n?/g, "\n");
+			if (trim) x = x.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).join("\n");
+			if (ignoreCase) x = x.toLowerCase();
+			return x;
+		};
+		const a = norm(left.value).split("\n");
+		const b = norm(right.value).split("\n");
+		if (!left.value && !right.value) {
+			status.innerHTML = `<span class="note-warn">${ui.empty}</span>`;
+			out.hidden = true;
+			return;
+		}
+		const d = diffLines(a, b);
+		const added = d.filter((x) => x.type === "add").length;
+		const removed = d.filter((x) => x.type === "del").length;
+		const same = d.filter((x) => x.type === "same").length;
+
+		plain = d.map((x) => (x.type === "same" ? `  ${x.text}` : x.type === "add" ? `+ ${x.text}` : `- ${x.text}`)).join("\n");
+		const color = { same: "var(--muted)", add: "#0a7d4f", del: "#c02b2b" };
+		const bg = { same: "transparent", add: "rgba(0,187,136,.08)", del: "rgba(220,38,38,.07)" };
+
+		let html: string;
+		if (view === "unified") {
+			html = d
+				.map(
+					(x) =>
+						`<div style="background:${bg[x.type]};color:${color[x.type]};padding:1px 8px;white-space:pre-wrap"><span style="display:inline-block;width:16px;user-select:none">${
+							x.type === "add" ? "+" : x.type === "del" ? "-" : " "
+						}</span>${escapeHtml(x.text) || "&nbsp;"}</div>`,
+				)
+				.join("");
+		} else {
+			const leftLines: string[] = [];
+			const rightLines: string[] = [];
+			for (const x of d) {
+				if (x.type === "same") {
+					leftLines.push(`<div style="color:var(--muted);padding:1px 8px;white-space:pre-wrap">${escapeHtml(x.text) || "&nbsp;"}</div>`);
+					rightLines.push(`<div style="color:var(--muted);padding:1px 8px;white-space:pre-wrap">${escapeHtml(x.text) || "&nbsp;"}</div>`);
+				} else if (x.type === "del") {
+					leftLines.push(`<div style="background:${bg.del};color:${color.del};padding:1px 8px;white-space:pre-wrap">${escapeHtml(x.text) || "&nbsp;"}</div>`);
+				} else {
+					rightLines.push(`<div style="background:${bg.add};color:${color.add};padding:1px 8px;white-space:pre-wrap">${escapeHtml(x.text) || "&nbsp;"}</div>`);
+				}
+			}
+			html = `<div class="iogrid"><div><span class="label">${ui.left}</span><div class="outbox" style="border:1px solid var(--line);border-radius:var(--radius-card);font:12.5px/1.6 ui-monospace,Consolas,monospace;overflow:auto;max-height:520px">${leftLines.join("")}</div></div><div><span class="label">${ui.right}</span><div class="outbox" style="border:1px solid var(--line);border-radius:var(--radius-card);font:12.5px/1.6 ui-monospace,Consolas,monospace;overflow:auto;max-height:520px">${rightLines.join("")}</div></div></div>`;
+		}
+		out.innerHTML = html;
+		out.hidden = false;
+		status.innerHTML =
+			added + removed === 0
+				? `<b>${ui.identical}</b> · ${same} ${ui.lines}`
+				: `<b style="color:#c02b2b">−${removed}</b> <b style="color:#0a7d4f">+${added}</b> · ${same} ${ui.unchanged} · ${ui.similarity} ${Math.round((same / Math.max(1, Math.max(a.length, b.length))) * 100)}%`;
+	}
+
+	document.getElementById("run")!.addEventListener("click", run);
+	document.getElementById("swap")!.addEventListener("click", () => {
+	const t = left.value;
+	left.value = right.value;
+	right.value = t;
+	run();
+});
+	document.getElementById("clear")!.addEventListener("click", () => {
+	left.value = "";
+	right.value = "";
+	out.hidden = true;
+	status.textContent = "";
+});
+	bindCopy(document.getElementById("copy") as HTMLButtonElement, () => plain, ui.copied, ui.copy);
+	for (const sel of ["ignoreCase", "trim", "view"]) {
+		document.getElementById(sel)!.addEventListener("change", run);
+	}
+</script>

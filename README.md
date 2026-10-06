@@ -29,6 +29,16 @@
 | **HEIC → JPG**（任意浏览器） | `/image/heic-to-jpg/` | 原生解码优先 + `libheif` wasm 兜底 |
 | **图片转 ICO**（16–256 px 多尺寸） | `/image/image-to-ico/` | 手写 ICO 容器 + Canvas |
 | **EXIF 查看与清理** | `/image/exif-viewer/` | `exifr` 读取 + Canvas 重编码清除 |
+| **JSON 格式化**（美化 / 压缩 / 校验 / 排序） | `/dev/json-formatter/` | 原生 `JSON.parse` |
+| **Base64**（UTF-8 安全 / 文件转 Data URL） | `/dev/base64/` | `TextEncoder` + `btoa` |
+| **URL 编解码**（含查询参数解析） | `/dev/url-encode/` | `encodeURI` / `encodeURIComponent` |
+| **哈希计算**（MD5 / SHA-1 / 256 / 384 / 512） | `/dev/hash-generator/` | 自实现 MD5 + WebCrypto |
+| **UUID 生成**（批量 v4） | `/dev/uuid-generator/` | `crypto.randomUUID()` |
+| **时间戳转换**（秒 / 毫秒自动识别） | `/dev/timestamp/` | 原生 `Date` + `Intl` |
+| **正则测试**（实时高亮 / 捕获组 / 替换） | `/dev/regex-tester/` | 原生 `RegExp` |
+| **JWT 解析**（头部 / 载荷 / 过期时间） | `/dev/jwt-decoder/` | Base64URL 解码（**不验签**） |
+| **文本对比**（逐行 Diff，LCS） | `/dev/text-diff/` | 自实现 LCS |
+| **颜色转换**（HEX / RGB / HSL + WCAG 对比度） | `/dev/color-converter/` | 纯算术 |
 | 图片合成 PDF | `/pdf/image-to-pdf/` | `pdf-lib`（按需加载） |
 | **PDF 合并**（多文件、可排序） | `/pdf/merge-pdf/` | `pdf-lib` `copyPages()` |
 | **PDF 拆分**（页码范围 / 每页一份） | `/pdf/split-pdf/` | `pdf-lib` + 范围解析 |
