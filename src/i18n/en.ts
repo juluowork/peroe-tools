@@ -1831,4 +1831,67 @@ export const tools: ToolCopy[] = [
 			failed: "Failed",
 		},
 	},
+	{
+		slug: "crop-image",
+		category: "image",
+		icon: "crop",
+		accent: "#2563eb",
+		nav: "Crop & rotate",
+		h1: "Crop, rotate and flip a picture",
+		metaTitle: "Crop Image Online — Rotate, Flip, Square or Circle Crop, No Upload",
+		blurb: "Drag to crop, rotate, flip, circle or rounded corners",
+		lead: "Straighten a sideways phone photo, cut a screenshot down to the part that matters, or turn a portrait into a clean circle for an avatar — without installing anything.",
+		keywords: ["crop image", "crop photo online", "rotate image", "flip image", "circle crop", "rounded corners image", "square crop", "图片裁剪", "裁剪图片", "圆形裁剪"],
+		metaDescription:
+			"Crop a photo by dragging, lock it to 1:1, 4:3, 16:9 or a custom ratio, rotate and flip it, and export square, rounded or circular corners. Nothing is uploaded.",
+		steps: [
+			"Drop in a picture.",
+			"Drag the handles to frame the crop, or pick a ratio such as 1:1 or 16:9 to lock the shape.",
+			"Rotate or flip if needed, choose square, rounded or circular corners, then save.",
+		],
+		notes: [
+			{
+				title: "The crop is real pixels, not a CSS trick",				body: "The exported file contains only the cropped area at its original resolution — there is no hidden remainder. That is what makes it safe to send: nobody can widen the picture back and see what you cut out.",
+			},
+			{
+				title: "Rotating bakes the change in",				body: "Rotate and flip are applied to the image itself before cropping, so a sideways photo becomes genuinely upright rather than carrying an orientation flag that other software might ignore.",
+			},
+			{
+				title: "Circular and rounded corners keep transparency",				body: "Use PNG (or WebP) for circular avatars, since JPG has no transparency and the corners will come out white. The tool warns you by keeping the format selector visible at all times.",
+			},
+		],
+		faq: [
+			{
+				q: "How do I crop to an exact size?",				a: "Drag roughly into place, then pick the closest ratio — the crop snaps to that shape and stays there while you resize. The exported pixel size is shown after saving, so you can adjust and try again.",
+			},
+			{
+				q: "Can I undo a crop after saving?",				a: "Not in the exported file, which is why the original stays untouched on your disk. Just drop the original in again and reframe.",
+			},
+			{
+				q: "Why is my circle white in the corners?",				a: "You exported as JPG, which cannot store transparency. Switch the format to PNG or WebP and the corners will be transparent.",
+			},
+		],
+		ui: {
+			...uiCommon,
+			dropzone: "Drop a picture here",
+			rotateLeft: "Rotate left",
+			rotateRight: "Rotate right",
+			flipH: "Flip horizontally",
+			flipV: "Flip vertically",
+			ratio: "Aspect ratio",
+			ratioFree: "Free",
+			corners: "Corners",
+			cornerSquare: "Square",
+			cornerRound: "Rounded",
+			cornerCircle: "Circle",
+			format: "Format",
+			hint: "Drag inside the frame to move it, drag a handle to resize, or drag on the image to draw a new frame. With a ratio locked, use the corner handles.",
+			save: "Save cropped image",
+			selectAll: "Select whole image",
+			centerSquare: "Centre square",
+			working: "Exporting…",
+			done: "Saved",
+			failed: "Failed",
+		},
+	},
 ];

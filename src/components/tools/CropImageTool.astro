@@ -1,0 +1,402 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="image/*" hidden />
+
+	<div id="editor" hidden>
+		<div class="crop-bar">
+			<div class="crop-tools">
+				<button type="button" class="cbtn" id="rotL" title={ui.rotateLeft}>⟲</button>
+				<button type="button" class="cbtn" id="rotR" title={ui.rotateRight}>⟳</button>
+				<button type="button" class="cbtn" id="flipH" title={ui.flipH}>⇋</button>
+				<button type="button" class="cbtn" id="flipV" title={ui.flipV}>⇅</button>
+			</div>
+			<div class="crop-opts">
+				<label class="cfield"><span>{ui.ratio}</span>
+					<select id="ratio">
+						<option value="free">{ui.ratioFree}</option>
+						<option value="1">1 : 1</option>
+						<option value="1.3333">4 : 3</option>
+						<option value="1.5">3 : 2</option>
+						<option value="1.7778">16 : 9</option>
+						<option value="0.75">3 : 4</option>
+						<option value="0.6667">2 : 3</option>
+						<option value="0.5625">9 : 16</option>
+					</select>
+				</label>
+				<label class="cfield"><span>{ui.corners}</span>
+					<select id="corner">
+						<option value="square">{ui.cornerSquare}</option>
+						<option value="round">{ui.cornerRound}</option>
+						<option value="circle">{ui.cornerCircle}</option>
+					</select>
+				</label>
+				<label class="cfield"><span>{ui.format}</span>
+					<select id="format">
+						<option value="image/png">PNG</option>
+						<option value="image/jpeg">JPG</option>
+						<option value="image/webp">WebP</option>
+					</select>
+				</label>
+			</div>
+		</div>
+
+		<p class="small muted" id="hint" style="margin:10px 0 0">{ui.hint}</p>
+		<div class="crop-stage"><canvas id="cv"></canvas></div>
+
+		<div class="btns">
+			<button class="btn-primary" id="save">{ui.save}</button>
+			<button class="btn-ghost" id="full">{ui.selectAll}</button>
+			<button class="btn-ghost" id="center">{ui.centerSquare}</button>
+			<button class="btn-link" id="reset">{ui.startOver}</button>
+		</div>
+		<p class="empty" id="status"></p>
+	</div>
+</div>
+
+<style>
+	.crop-bar {
+		display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+		padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--soft);
+	}
+	.crop-tools { display: flex; gap: 6px; }
+	.cbtn {
+		width: 38px; height: 34px; font-size: 17px; line-height: 1; cursor: pointer;
+		border: 1px solid var(--line); border-radius: var(--radius-btn); background: var(--bg); color: var(--muted);
+	}
+	.cbtn:hover { border-color: var(--brand); color: var(--brand-dark); }
+	.crop-opts { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-left: auto; font-size: 13px; color: var(--muted); }
+	.cfield { display: flex; align-items: center; gap: 7px; }
+	.crop-stage { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; background: #0f172a; }
+	.crop-stage canvas { display: block; max-width: 100%; cursor: crosshair; touch-action: none; }
+</style>
+
+<script>
+	import { bindDropZone, clearBusy, download, escapeHtml, loadImage, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const fileIn = document.getElementById("file") as HTMLInputElement;
+	const editor = document.getElementById("editor")!;
+	const stage = document.querySelector(".crop-stage") as HTMLElement;
+	const cv = document.getElementById("cv") as HTMLCanvasElement;
+	const ctx = cv.getContext("2d")!;
+	const status = document.getElementById("status")!;
+	const ratioSel = document.getElementById("ratio") as HTMLSelectElement;
+	const cornerSel = document.getElementById("corner") as HTMLSelectElement;
+	const formatSel = document.getElementById("format") as HTMLSelectElement;
+
+	/** 变换后的图（旋转/翻转已经烘进去），裁剪矩形用它的坐标系 */
+	let work: HTMLCanvasElement | null = null;
+	let srcName = "image";
+	let scale = 1;
+	let crop = { x: 0, y: 0, w: 0, h: 0 };
+	let drag: { mode: string; sx: number; sy: number; start: { x: number; y: number; w: number; h: number } } | null = null;
+	const HANDLE = 12;
+	/**
+	 * 画布四周留白：裁剪框贴着图片边缘时（尤其初始的"整张图"），
+	 * 四角手柄会有一半在画布外，鼠标根本抓不住。留 16px 就能正常抓取了。
+	 */
+	const PAD = 16;
+
+	function bake(rotation: number, flipH: boolean, flipV: boolean, prev?: HTMLCanvasElement) {
+		const source = prev ?? work;
+		if (!source) return;
+		const rad = (rotation * Math.PI) / 180;
+		const swap = rotation === 90 || rotation === 270;
+		const out = document.createElement("canvas");
+		out.width = swap ? source.height : source.width;
+		out.height = swap ? source.width : source.height;
+		const g = out.getContext("2d")!;
+		g.translate(out.width / 2, out.height / 2);
+		g.rotate(rad);
+		g.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+		g.drawImage(source, -source.width / 2, -source.height / 2);
+		work = out;
+	}
+
+	function fit() {
+		if (!work) return;
+		const maxW = Math.min(stage.parentElement?.clientWidth ?? 900, 1100);
+		scale = Math.min(1, maxW / work.width);
+		cv.width = Math.round(work.width * scale) + PAD * 2;
+		cv.height = Math.round(work.height * scale) + PAD * 2;
+		render();
+	}
+
+	function selectAll() {
+		if (!work) return;
+		crop = { x: 0, y: 0, w: work.width, h: work.height };
+		render();
+	}
+
+	function centerSquare() {
+		if (!work) return;
+		const side = Math.min(work.width, work.height);
+		crop = { x: (work.width - side) / 2, y: (work.height - side) / 2, w: side, h: side };
+		render();
+	}
+
+	/** 按比例吸附：以矩形中心为基准，取能容纳的最大同比例矩形 */
+	function applyRatio() {
+		const r = ratioSel.value === "free" ? 0 : Number(ratioSel.value);
+		if (!r || !work) return;
+		const cx = crop.x + crop.w / 2;
+		const cy = crop.y + crop.h / 2;
+		let w = crop.w;
+		let h = w / r;
+		if (h > crop.h) {
+			h = crop.h;
+			w = h * r;
+		}
+		crop = { x: cx - w / 2, y: cy - h / 2, w, h };
+		clampCrop();
+		render();
+	}
+
+	function clampCrop() {
+		if (!work) return;
+		crop.w = Math.max(16, Math.min(crop.w, work.width));
+		crop.h = Math.max(16, Math.min(crop.h, work.height));
+		crop.x = Math.max(0, Math.min(crop.x, work.width - crop.w));
+		crop.y = Math.max(0, Math.min(crop.y, work.height - crop.h));
+	}
+
+	function handles() {
+		const r = crop;
+		return [
+			{ id: "nw", x: r.x, y: r.y },
+			{ id: "n", x: r.x + r.w / 2, y: r.y },
+			{ id: "ne", x: r.x + r.w, y: r.y },
+			{ id: "e", x: r.x + r.w, y: r.y + r.h / 2 },
+			{ id: "se", x: r.x + r.w, y: r.y + r.h },
+			{ id: "s", x: r.x + r.w / 2, y: r.y + r.h },
+			{ id: "sw", x: r.x, y: r.y + r.h },
+			{ id: "w", x: r.x, y: r.y + r.h / 2 },
+		];
+	}
+
+	function render() {
+		if (!work) return;
+		ctx.clearRect(0, 0, cv.width, cv.height);
+		ctx.save();
+		ctx.translate(PAD, PAD);
+		ctx.drawImage(work, 0, 0, work.width * scale, work.height * scale);
+		ctx.restore();
+
+		// 裁剪框外压暗（四块矩形拼出遮罩，兼容性最好）；遮罩含四周留白
+		ctx.fillStyle = "rgba(15,23,42,.55)";
+		const x = crop.x * scale + PAD;
+		const y = crop.y * scale + PAD;
+		const w = crop.w * scale;
+		const h = crop.h * scale;
+		ctx.fillRect(0, 0, cv.width, y);
+		ctx.fillRect(0, y + h, cv.width, cv.height - (y + h));
+		ctx.fillRect(0, y, x, h);
+		ctx.fillRect(x + w, y, cv.width - (x + w), h);
+
+		// 网格线
+		ctx.strokeStyle = "rgba(255,255,255,.35)";
+		ctx.lineWidth = 1;
+		for (let i = 1; i <= 2; i++) {
+			ctx.beginPath();
+			ctx.moveTo(x + (w * i) / 3, y);
+			ctx.lineTo(x + (w * i) / 3, y + h);
+			ctx.moveTo(x, y + (h * i) / 3);
+			ctx.lineTo(x + w, y + (h * i) / 3);
+			ctx.stroke();
+		}
+
+		// 边框 + 手柄
+		ctx.strokeStyle = "#00bb88";
+		ctx.lineWidth = 2;
+		ctx.strokeRect(x, y, w, h);
+		ctx.fillStyle = "#00bb88";
+		const locked = ratioSel.value !== "free";
+		for (const hd of handles()) {
+			if (locked && hd.id.length === 1) continue; // 锁比例时只保留四角
+			ctx.fillRect(hd.x * scale + PAD - 6, hd.y * scale + PAD - 6, 12, 12);
+		}
+	}
+
+	function toWork(ev: PointerEvent) {
+		const r = cv.getBoundingClientRect();
+		return { x: (ev.clientX - r.left - PAD) / scale, y: (ev.clientY - r.top - PAD) / scale };
+	}
+
+	cv.addEventListener("pointerdown", (ev) => {
+		if (!work) return;
+		cv.setPointerCapture(ev.pointerId);
+		const p = toWork(ev);
+		const locked = ratioSel.value !== "free";
+		for (const hd of handles()) {
+			if (locked && hd.id.length === 1) continue;
+			if (Math.abs(p.x - hd.x) * scale < HANDLE && Math.abs(p.y - hd.y) * scale < HANDLE) {
+				drag = { mode: hd.id, sx: p.x, sy: p.y, start: { ...crop } };
+				return;
+			}
+		}
+		if (p.x > crop.x && p.x < crop.x + crop.w && p.y > crop.y && p.y < crop.y + crop.h) {
+			drag = { mode: "move", sx: p.x, sy: p.y, start: { ...crop } };
+		} else {
+			crop = { x: p.x, y: p.y, w: 16, h: 16 };
+			drag = { mode: "se", sx: p.x, sy: p.y, start: { ...crop } };
+		}
+		render();
+	});
+
+	cv.addEventListener("pointermove", (ev) => {
+		if (!drag || !work) return;
+		const p = toWork(ev);
+		const dx = p.x - drag.sx;
+		const dy = p.y - drag.sy;
+		const s = drag.start;
+		const locked = ratioSel.value === "free" ? 0 : Number(ratioSel.value);
+		let next = { ...s };
+
+		if (drag.mode === "move") {
+			next.x = s.x + dx;
+			next.y = s.y + dy;
+		} else {
+			let left = s.x;
+			let top = s.y;
+			let right = s.x + s.w;
+			let bottom = s.y + s.h;
+			if (drag.mode.includes("w")) left = Math.min(s.x + dx, right - 16);
+			if (drag.mode.includes("e")) right = Math.max(s.x + s.w + dx, left + 16);
+			if (drag.mode.includes("n")) top = Math.min(s.y + dy, bottom - 16);
+			if (drag.mode.includes("s")) bottom = Math.max(s.y + s.h + dy, top + 16);
+			next = { x: left, y: top, w: right - left, h: bottom - top };
+			if (locked) {
+				// 锁比例：以拖动的角为锚点，按宽度换算高度
+				const anchorX = drag.mode.includes("w") ? right : left;
+				const anchorY = drag.mode.includes("n") ? bottom : top;
+				const w = next.w;
+				const h = w / locked;
+				next = {
+					x: drag.mode.includes("w") ? anchorX - w : anchorX,
+					y: drag.mode.includes("n") ? anchorY - h : anchorY,
+					w,
+					h,
+				};
+				// 超出边界时按高度反算
+				if (next.y < 0 || next.y + next.h > work.height) {
+					const h2 = Math.min(next.h, drag.mode.includes("n") ? anchorY : work.height - anchorY);
+					const w2 = h2 * locked;
+					next = {
+						x: drag.mode.includes("w") ? anchorX - w2 : anchorX,
+						y: drag.mode.includes("n") ? anchorY - h2 : anchorY,
+						w: w2,
+						h: h2,
+					};
+				}
+			}
+		}
+		crop = next;
+		clampCrop();
+		render();
+	});
+
+	const stop = () => {
+		drag = null;
+	};
+	cv.addEventListener("pointerup", stop);
+	cv.addEventListener("pointercancel", stop);
+
+	// 旋转 / 翻转：先把当前图烘成新图，再重置裁剪框
+	function transform(rotation: number, flipH: boolean, flipV: boolean) {
+		if (!work) return;
+		bake(rotation, flipH, flipV);
+		fit();
+		selectAll();
+	}
+	document.getElementById("rotR")!.addEventListener("click", () => transform(90, false, false));
+	document.getElementById("rotL")!.addEventListener("click", () => transform(270, false, false));
+	document.getElementById("flipH")!.addEventListener("click", () => transform(0, true, false));
+	document.getElementById("flipV")!.addEventListener("click", () => transform(0, false, true));
+	ratioSel.addEventListener("change", applyRatio);
+
+	bindDropZone(dz, fileIn, async (picked) => {
+		const f = picked.find((x) => x.type.startsWith("image/"));
+		if (!f) return;
+		srcName = f.name;
+		const loaded = await loadImage(f);
+		const bitmap = loaded.bitmap;
+		const base = document.createElement("canvas");
+		base.width = bitmap.width;
+		base.height = bitmap.height;
+		base.getContext("2d")!.drawImage(bitmap, 0, 0);
+		bitmap.close();
+		work = base;
+		dz.hidden = true;
+		editor.hidden = false;
+		status.textContent = "";
+		fit();
+		selectAll();
+	});
+
+	document.getElementById("full")!.addEventListener("click", selectAll);
+	document.getElementById("center")!.addEventListener("click", centerSquare);
+	document.getElementById("reset")!.addEventListener("click", () => {
+		work = null;
+		editor.hidden = true;
+		dz.hidden = false;
+		dz.classList.remove("is-compact");
+		status.textContent = "";
+		fileIn.value = "";
+	});
+
+	document.getElementById("save")!.addEventListener("click", async () => {
+		if (!work) return;
+		const btn = document.getElementById("save") as HTMLButtonElement;
+		setBusy(btn, ui.working);
+		try {
+			const x = Math.round(crop.x);
+			const y = Math.round(crop.y);
+			const w = Math.round(crop.w);
+			const h = Math.round(crop.h);
+			const out = document.createElement("canvas");
+			out.width = w;
+			out.height = h;
+			const g = out.getContext("2d")!;
+			const style = cornerSel.value;
+			if (style !== "square") {
+				const r = style === "circle" ? Math.min(w, h) / 2 : Math.min(w, h) * 0.12;
+				g.beginPath();
+				if (style === "circle") g.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+				else g.roundRect(0, 0, w, h, r);
+				g.clip();
+			}
+			g.drawImage(work, x, y, w, h, 0, 0, w, h);
+			const mime = formatSel.value;
+			const ext = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : "png";
+			const blob: Blob = await new Promise((res, rej) =>
+				out.toBlob((b) => (b ? res(b) : rej(new Error("export failed"))), mime, 0.94),
+			);
+			const base = srcName.replace(/\.[^.]+$/, "") || "image";
+			download(blob, `${base}-crop.${ext}`);
+			status.innerHTML = `${ui.done} · ${w}×${h} px${
+				style !== "square" ? ` · ${style === "circle" ? ui.cornerCircle : ui.cornerRound}` : ""
+			}`;
+		} catch (err) {
+			status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+		clearBusy(btn);
+	});
+
+	window.addEventListener("resize", () => {
+		if (work) fit();
+	});
+</script>

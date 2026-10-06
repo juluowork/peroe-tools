@@ -30,6 +30,7 @@
 | **图片转 ICO**（16–256 px 多尺寸） | `/image/image-to-ico/` | 手写 ICO 容器 + Canvas |
 | **EXIF 查看与清理** | `/image/exif-viewer/` | `exifr` 读取 + Canvas 重编码清除 |
 | **图片标注与打码**（方框/椭圆/箭头/手绘/文字/马赛克/纯色） | `/image/annotate-image/` | Canvas 绘制 + 离屏马赛克 |
+| **图片裁剪与旋转**（比例锁定 / 旋转翻转 / 圆形圆角） | `/image/crop-image/` | Canvas 裁剪 + `roundRect`/`ellipse` 裁剪路径 |
 | **JSON 格式化**（美化 / 压缩 / 校验 / 排序） | `/dev/json-formatter/` | 原生 `JSON.parse` |
 | **Base64**（UTF-8 安全 / 文件转 Data URL） | `/dev/base64/` | `TextEncoder` + `btoa` |
 | **URL 编解码**（含查询参数解析） | `/dev/url-encode/` | `encodeURI` / `encodeURIComponent` |

@@ -85,6 +85,7 @@ const TOOL_ICONS: Record<string, string> = {
 	"pdf-to-text": "pages",
 	"watermark-image": "image",
 	"annotate-image": "pen",
+	"crop-image": "crop",
 	"image-to-ico": "image",
 	"exif-viewer": "image",
 	"heic-to-jpg": "convert",
