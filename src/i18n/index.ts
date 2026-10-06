@@ -83,7 +83,7 @@ const TOOL_ICONS: Record<string, string> = {
 	"organize-pdf": "merge",
 	"extract-pdf-text": "pages",
 	"pdf-to-text": "pages",
-	"image-watermark": "image",
+	"watermark-image": "image",
 	"image-to-ico": "image",
 	"exif-viewer": "image",
 	"heic-to-jpg": "convert",

@@ -30,6 +30,10 @@
 | **PDF 拆分**（页码范围 / 每页一份） | `/pdf/split-pdf/` | `pdf-lib` + 范围解析 |
 | **PDF 转图片**（JPG/PNG/WebP、1x-3x） | `/pdf/pdf-to-images/` | `pdf.js` 渲染 + Canvas 编码 |
 | **PDF 压缩**（重编码为优化 JPEG） | `/pdf/compress-pdf/` | `pdf.js` + `pdf-lib` |
+| **PDF 加水印**（斜向 / 平铺，支持中文） | `/pdf/watermark-pdf/` | 文字转图 + `pdf-lib` 嵌入 |
+| **PDF 加页码**（位置 / 格式 / 起始值） | `/pdf/page-numbers-pdf/` | `pdf-lib` 标准字体 |
+| **页面整理**（旋转 / 删除 / 调序） | `/pdf/organize-pdf/` | `pdf.js` 缩略图 + `pdf-lib` |
+| **提取文本**（页码范围 / 复制 / 存 txt） | `/pdf/extract-pdf-text/` | `pdf.js` `getTextContent()` |
 
 - **slug 一律英文**（两种语言共用，便于权重集中），中文只体现在展示文案与 `/zh/` 前缀。
 - 旧版本用过扁平 URL（`/compress-image/`），**已在 `public/_redirects` 里 301 到新地址**；`/en/*` 同理。
@@ -39,6 +43,11 @@
   **只显示"有工具的分类"**（`activeCategories()`），避免出现空页面。
 
 ## 信息架构（工具变多也不会找不到）
+
+**布局**：`/categories/`、`/tools/`、分类枢纽页统一采用 **左侧边栏（分类 + 工具数，高亮当前项）+ 右侧内容**；
+工具在内容区以**紧凑列表行**（图标 + 名称 + 一句话 + 箭头）呈现，不用大卡片 —— 工具变多时列表比卡片网格更好扫。
+移动端侧边栏收成横向可滚动的一行。
+
 
 - **顶栏**：首页 · 分类（≤4 个直接平铺）· 全部工具（下拉里按分类列全部工具）· 语言切换。
   **不放**几十个工具直链、登录、收藏、广告。

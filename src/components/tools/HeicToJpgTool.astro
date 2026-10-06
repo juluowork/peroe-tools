@@ -1,0 +1,138 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept=".heic,.heif,image/heic,image/heif,image/*" multiple hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div class="options" id="options" hidden>
+		<label class="field"><span class="lbl">{ui.format}</span>
+			<select id="format">
+				<option value="image/jpeg">JPG</option>
+				<option value="image/png">PNG</option>
+				<option value="image/webp">WebP</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.quality} <b id="qv">92%</b></span>
+			<input id="quality" type="range" min="50" max="100" value="92" />
+		</label>
+	</div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="add">{ui.addMore}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, download, escapeHtml, formatBytes, opButton, renderRow, replaceExt, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const options = document.getElementById("options")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	const qv = document.getElementById("qv")!;
+	const quality = document.getElementById("quality") as HTMLInputElement;
+	let files: File[] = [];
+	quality.addEventListener("input", () => (qv.textContent = `${quality.value}%`));
+
+	function renderBase() {
+		list.innerHTML = "";
+		files.forEach((f) => list.appendChild(renderRow({ name: f.name, sizeText: formatBytes(f.size) })));
+		options.hidden = files.length === 0;
+		actions.hidden = files.length === 0;
+	}
+	bindDropZone(dz, input, (picked) => {
+		files = files.concat(picked.filter((f) => /\.(heic|heif)$/i.test(f.name) || f.type.startsWith("image/")));
+		dz.classList.add("is-compact");
+		renderBase();
+	});
+	document.getElementById("add")!.addEventListener("click", () => input.click());
+	document.getElementById("reset")!.addEventListener("click", () => {
+		files = [];
+		dz.classList.remove("is-compact");
+		renderBase();
+});
+
+	/** 优先用浏览器原生解码（Safari 支持 HEIC）；不行再用 libheif wasm（2MB，按需加载） */
+	async function decodeHeic(file: File): Promise<ImageBitmap | HTMLCanvasElement> {
+		try {
+			return await createImageBitmap(file);
+		} catch {
+			// 走 wasm
+		}
+		const mod: any = await import("libheif-js/wasm-bundle");
+		const libheif = mod.default ?? mod;
+		const decoder = new libheif.HeifDecoder();
+		const images = decoder.decode(new Uint8Array(await file.arrayBuffer()));
+		if (!images || images.length === 0) throw new Error("no image in file");
+		const image = images[0];
+		const width = image.get_width();
+		const height = image.get_height();
+		const data = await new Promise<any>((resolve, reject) => {
+			image.display({ data: new Uint8ClampedArray(width * height * 4), width, height }, (d: any) =>
+				d ? resolve(d) : reject(new Error("HEIF processing error")),
+			);
+		});
+		const canvas = document.createElement("canvas");
+		canvas.width = width;
+		canvas.height = height;
+		canvas.getContext("2d")!.putImageData(new ImageData(data.data, width, height), 0, 0);
+		return canvas;
+	}
+
+	function sourceToCanvas(src: ImageBitmap | HTMLCanvasElement): HTMLCanvasElement {
+		if (src instanceof HTMLCanvasElement) return src;
+		const canvas = document.createElement("canvas");
+		canvas.width = src.width;
+		canvas.height = src.height;
+		canvas.getContext("2d")!.drawImage(src, 0, 0);
+		return canvas;
+	}
+
+	runBtn.addEventListener("click", async () => {
+	if (files.length === 0) return;
+	setBusy(runBtn, ui.loading);
+	renderBase();
+	const rows = [...list.children] as HTMLLIElement[];
+	const mime = (document.getElementById("format") as HTMLSelectElement).value;
+	const ext = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : "png";
+	const q = Number(quality.value) / 100;
+	for (let i = 0; i < files.length; i++) {
+		const file = files[i];
+		const li = rows[i];
+		setBusy(runBtn, `${ui.working} ${i + 1}/${files.length}`);
+		try {
+			const canvas = sourceToCanvas(await decodeHeic(file));
+			const blob: Blob = await new Promise((res, rej) =>
+				canvas.toBlob((b) => (b ? res(b) : rej(new Error("export failed"))), mime, q),
+			);
+			li.querySelector(".thumb")?.replaceWith(Object.assign(document.createElement("img"), { className: "thumb", src: canvas.toDataURL("image/jpeg", 0.5) }));
+			li.querySelector(".fsize")!.innerHTML = `${canvas.width}×${canvas.height} · ${formatBytes(file.size)} → <b>${formatBytes(blob.size)}</b>`;
+			li.querySelector(".ops")!.appendChild(opButton(ui.download, "primary", () => download(blob, replaceExt(file.name, ext))));
+		} catch (err) {
+			li.querySelector(".fsize")!.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+	}
+	clearBusy(runBtn);
+	status.textContent = ui.done;
+});
+</script>

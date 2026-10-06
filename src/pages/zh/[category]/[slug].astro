@@ -13,6 +13,10 @@ import WatermarkPdfTool from "../../../components/tools/WatermarkPdfTool.astro";
 import PageNumbersPdfTool from "../../../components/tools/PageNumbersPdfTool.astro";
 import OrganizePdfTool from "../../../components/tools/OrganizePdfTool.astro";
 import ExtractPdfTextTool from "../../../components/tools/ExtractPdfTextTool.astro";
+import ImageWatermarkTool from "../../../components/tools/ImageWatermarkTool.astro";
+import HeicToJpgTool from "../../../components/tools/HeicToJpgTool.astro";
+import ImageToIcoTool from "../../../components/tools/ImageToIcoTool.astro";
+import ExifTool from "../../../components/tools/ExifTool.astro";
 import { getSite, getTools } from "../../../i18n";
 import type { ToolCopy } from "../../../i18n";
 
@@ -40,6 +44,10 @@ const components: Record<string, typeof CompressTool> = {
 	"page-numbers-pdf": PageNumbersPdfTool,
 	"organize-pdf": OrganizePdfTool,
 	"extract-pdf-text": ExtractPdfTextTool,
+	"watermark-image": ImageWatermarkTool,
+	"heic-to-jpg": HeicToJpgTool,
+	"image-to-ico": ImageToIcoTool,
+	"exif-viewer": ExifTool,
 };
 const Tool = components[tool.slug];
 ---

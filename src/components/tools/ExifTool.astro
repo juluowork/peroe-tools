@@ -1,0 +1,156 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="image/*,.heic,.heif" multiple hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div id="panel" hidden></div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.clean}</button>
+		<button class="btn-ghost" id="add">{ui.addMore}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, download, escapeHtml, formatBytes, opButton, renderRow, replaceExt, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const panel = document.getElementById("panel")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	let files: File[] = [];
+	let report: Record<string, unknown> | null = null;
+
+	const LABELS: Record<string, string> = {
+		Make: ui.lMake, Model: ui.lModel, LensModel: ui.lLens, FNumber: ui.lFNumber,
+		ExposureTime: ui.lExposure, ISO: ui.lIso, FocalLength: ui.lFocal, DateTimeOriginal: ui.lDate,
+		ExifImageWidth: ui.lWidth, ExifImageHeight: ui.lHeight, Orientation: ui.lOrient,
+		latitude: ui.lLat, longitude: ui.lLon, Software: ui.lSoftware, Artist: ui.lArtist,
+		Copyright: ui.lCopyright, Flash: ui.lFlash, MeteringMode: ui.lMetering, WhiteBalance: ui.lWb,
+		ColorSpace: ui.lColorSpace, ExposureProgram: ui.lProgram,
+	};
+
+	function fmtValue(v: unknown): string {
+		if (v === null || v === undefined) return "—";
+		if (v instanceof Date) return v.toISOString().replace("T", " ").slice(0, 19);
+		if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+		if (typeof v === "object") return JSON.stringify(v);
+		return String(v);
+	}
+
+	function renderPanel() {
+		if (!report) {
+			panel.hidden = true;
+			return;
+		}
+		const keys = Object.keys(LABELS).filter((k) => report![k] !== undefined);
+		const extra = Object.keys(report).filter((k) => !LABELS[k]);
+		const rows = keys.map((k) => `<tr><th>${escapeHtml(LABELS[k])}</th><td>${escapeHtml(fmtValue(report![k]))}</td></tr>`);
+		const gps = report.latitude !== undefined ? `<tr><th>${ui.lGps}</th><td>${fmtValue(report.latitude)}, ${fmtValue(report.longitude)}</td></tr>` : "";
+		panel.innerHTML = `<div class="card" style="margin-top:16px">
+			<h3 style="margin-top:0">${ui.found}: ${keys.length + (gps ? 1 : 0)}</h3>
+			<table class="exif">${rows.join("")}${gps}</table>
+			${extra.length ? `<p class="small muted" style="margin:10px 0 0">${ui.alsoFound}: ${escapeHtml(extra.slice(0, 14).join(", "))}${extra.length > 14 ? " …" : ""}</p>` : ""}
+			${report.latitude !== undefined ? `<p class="note-warn" style="margin:10px 0 0">${ui.gpsWarn}</p>` : ""}
+		</div>`;
+		panel.hidden = false;
+	}
+
+	async function analyze(file: File) {
+		report = null;
+		try {
+			const exifr: any = await import("exifr");
+			const parse = exifr.parse ?? exifr.default?.parse;
+			report = await parse(file, { tiff: true, exif: true, gps: true, ifd0: true, interop: true, translateValues: true, reviveValues: true });
+		} catch {
+			report = {};
+		}
+		if (!report || Object.keys(report).length === 0) {
+			panel.innerHTML = `<div class="card" style="margin-top:16px"><p class="small muted" style="margin:0">${ui.none}</p></div>`;
+			panel.hidden = false;
+		} else {
+			renderPanel();
+		}
+	}
+
+	function renderBase() {
+		list.innerHTML = "";
+		files.forEach((f) => list.appendChild(renderRow({ name: f.name, sizeText: formatBytes(f.size), thumbUrl: URL.createObjectURL(f) })));
+		actions.hidden = files.length === 0;
+	}
+
+	bindDropZone(dz, input, async (picked) => {
+		const imgs = picked.filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+		if (imgs.length === 0) return;
+		files = files.concat(imgs);
+		dz.classList.add("is-compact");
+		renderBase();
+		await analyze(files[0]);
+	});
+
+	document.getElementById("add")!.addEventListener("click", () => input.click());
+	document.getElementById("reset")!.addEventListener("click", () => {
+		files = [];
+		report = null;
+		list.innerHTML = "";
+		panel.hidden = true;
+		actions.hidden = true;
+		status.textContent = "";
+		dz.classList.remove("is-compact");
+});
+
+	runBtn.addEventListener("click", async () => {
+	if (files.length === 0) return;
+	renderBase();
+	const rows = [...list.children] as HTMLLIElement[];
+	for (let i = 0; i < files.length; i++) {
+		const file = files[i];
+		const li = rows[i];
+		setBusy(runBtn, `${ui.working} ${i + 1}/${files.length}`);
+		try {
+			// 经 canvas 重新编码 = 丢掉全部元数据（EXIF/GPS/缩略图）
+			const bitmap = await createImageBitmap(file);
+			const canvas = document.createElement("canvas");
+			canvas.width = bitmap.width;
+			canvas.height = bitmap.height;
+			canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+			const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
+			const blob: Blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("export failed"))), mime, 0.94));
+			const outName = replaceExt(file.name, mime === "image/png" ? "png" : "jpg");
+			li.querySelector(".fsize")!.innerHTML = `${formatBytes(file.size)} → <b>${formatBytes(blob.size)}</b> · ${ui.cleaned}`;
+			li.querySelector(".ops")!.appendChild(opButton(ui.download, "primary", () => download(blob, outName)));
+			bitmap.close();
+		} catch (err) {
+			li.querySelector(".fsize")!.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+		}
+	}
+	clearBusy(runBtn);
+	status.textContent = ui.done;
+});
+</script>
+
+<style>
+	:global(table.exif) { width: 100%; border-collapse: collapse; font-size: 14px; }
+	:global(table.exif th) { text-align: left; font-weight: 500; color: var(--muted); padding: 6px 12px 6px 0; white-space: nowrap; vertical-align: top; }
+	:global(table.exif td) { padding: 6px 0; word-break: break-word; }
+</style>
