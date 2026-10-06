@@ -7,6 +7,14 @@
 - 部署：Cloudflare Worker `peroe-tools`（静态资源模式）+ zone 路由 `tools.juluo.work/*`
 - 姊妹项目：博客 `juluowork/fuwari`（<https://blog.peroe.cn>）
 
+## PWA（可安装 + 真离线）
+
+- `public/manifest.webmanifest` + 图标（192/512/maskable/apple-touch）+ `public/sw.js`
+- SW 策略：**页面导航网络优先**（在线时永远拿到最新版，断网回落缓存）；**静态资源缓存优先 + 后台更新**
+  （`/_astro/`、`/qpdf/`、图片字体）→ 工具用的 pdf.js / wasm 装一次就离线可用
+- 只在正式域名注册 SW（避免本地调试被缓存干扰）
+- ⚠️ 改 `sw.js` 里的 `VERSION` 才会让所有客户端换新缓存
+
 ## 工具与语言
 
 ### URL 规则（分类进 URL）

@@ -40,6 +40,9 @@ const alt = origin + localePath(locale === "en" ? "zh" : "en", path);
 		<meta property="og:url" content={canonical} />
 		<meta property="og:locale" content={locale === "en" ? "en_US" : "zh_CN"} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<!-- PWA：可安装 + 真离线（见 public/sw.js）。这是纯前端架构才能给的保证 -->
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/manifest.webmanifest" />
 		{jsonLdList.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}
 		<!-- 站长验证：Bing（token 是账号级的，与博客同一串；另有 public/BingSiteAuth.xml 兜底） -->
 		<meta name="msvalidate.01" content="91E5B16A2CD2E86042B923AF197EC312" />
@@ -51,6 +54,14 @@ const alt = origin + localePath(locale === "en" ? "zh" : "en", path);
 			data-website-id="bc70c244-bba3-4e53-b275-c405b930c82e"
 			data-domains="tools.juluo.work"
 		></script>
+		<!-- 注册 Service Worker：只在正式域名上注册，避免本地调试被缓存干扰 -->
+		<script is:inline>
+			if ("serviceWorker" in navigator && location.hostname === "tools.juluo.work") {
+				window.addEventListener("load", function () {
+					navigator.serviceWorker.register("/sw.js").catch(function () {});
+				});
+			}
+		</script>
 	</head>
 	<body>
 		<header class="site-header">
