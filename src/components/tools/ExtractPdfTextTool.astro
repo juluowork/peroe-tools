@@ -1,0 +1,168 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div class="options" id="options" hidden>
+		<label class="field"><span class="lbl">{ui.range}</span>
+			<input id="range" type="text" placeholder="1-3, 5" />
+		</label>
+		<label class="field"><span class="lbl">{ui.sep}</span>
+			<select id="sep">
+				<option value="page">{ui.sepPage}</option>
+				<option value="blank">{ui.sepBlank}</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="copy" hidden>{ui.copy}</button>
+		<button class="btn-ghost" id="savetxt" hidden>{ui.saveTxt}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+	<textarea id="out" hidden rows="16" style="width:100%;margin-top:14px;font:13px/1.6 ui-monospace,Consolas,monospace;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--fg)" spellcheck="false"></textarea>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, escapeHtml, formatBytes, opButton, renderRow, setBusy } from "../../lib/imgtools.client";
+	import { parsePageRanges } from "../../lib/pdfjs.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const options = document.getElementById("options")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const copyBtn = document.getElementById("copy") as HTMLButtonElement;
+	const saveBtn = document.getElementById("savetxt") as HTMLButtonElement;
+	const out = document.getElementById("out") as HTMLTextAreaElement;
+	const status = document.getElementById("status")!;
+	let file: File | null = null;
+	let pageCount = 0;
+	let extracted = "";
+
+	bindDropZone(dz, input, async (picked) => {
+		const pdf = picked.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+		if (!pdf) return;
+		file = pdf;
+		dz.classList.add("is-compact");
+		options.hidden = false;
+		actions.hidden = false;
+		out.hidden = true;
+		list.innerHTML = "";
+		const li = renderRow({ name: pdf.name, sizeText: `${formatBytes(pdf.size)} · ${ui.reading}` });
+		li.querySelector(".ops")!.append(
+			opButton(ui.remove, "danger", () => {
+				file = null;
+				list.innerHTML = "";
+				options.hidden = true;
+				actions.hidden = true;
+				out.hidden = true;
+				status.textContent = "";
+				dz.classList.remove("is-compact");
+			}),
+		);
+		list.appendChild(li);
+		try {
+			const { openPdf } = await import("../../lib/pdfjs.client");
+			const open = await openPdf(await pdf.arrayBuffer());
+			pageCount = open.numPages;
+			li.querySelector(".fsize")!.innerHTML = `${formatBytes(pdf.size)} · <b>${pageCount}</b> ${ui.pages}`;
+		} catch (err) {
+			li.querySelector(".fsize")!.innerHTML = `<span class="note-warn">${escapeHtml((err as Error).message)}</span>`;
+		}
+	});
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		file = null;
+		list.innerHTML = "";
+		options.hidden = true;
+		actions.hidden = true;
+		out.hidden = true;
+		status.textContent = "";
+		dz.classList.remove("is-compact");
+});
+
+	runBtn.addEventListener("click", async () => {
+	if (!file) return;
+	setBusy(runBtn, ui.loading);
+	status.textContent = "";
+	try {
+		const { openPdf } = await import("../../lib/pdfjs.client");
+		const open = await openPdf(await file.arrayBuffer());
+		const total = open.numPages;
+		const rangeInput = (document.getElementById("range") as HTMLInputElement).value.trim();
+		const wanted = rangeInput ? parsePageRanges(rangeInput, total) : Array.from({ length: total }, (_, i) => i + 1);
+		const sep = (document.getElementById("sep") as HTMLSelectElement).value;
+		const chunks: string[] = [];
+		for (let i = 0; i < wanted.length; i++) {
+			setBusy(runBtn, `${ui.working} ${i + 1}/${wanted.length}`);
+			const page = await open.doc.getPage(wanted[i]);
+			const content = await page.getTextContent();
+			// 按行拼装：pdf.js 给的是碎片，用 transform[5]（y 坐标）变化判断换行
+			let text = "";
+			let lastY: number | null = null;
+			for (const item of content.items as any[]) {
+				if (!("str" in item)) continue;
+				const y = item.transform?.[5] ?? 0;
+				if (lastY !== null && Math.abs(y - lastY) > 2) text += "\n";
+				text += item.str;
+				if (item.hasEOL) text += "\n";
+				lastY = y;
+			}
+			text = text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+			chunks.push(sep === "page" ? `--- ${ui.page} ${wanted[i]} ---\n${text}` : text);
+		}
+		extracted = chunks.join("\n\n");
+		const words = extracted.split(/\s+/).filter(Boolean).length;
+		out.value = extracted;
+		out.hidden = false;
+		copyBtn.hidden = false;
+		saveBtn.hidden = false;
+		status.innerHTML = `${ui.done} · ${wanted.length} ${ui.pages} · ${extracted.length} ${ui.chars} · ${words} ${ui.words}`;
+		if (extracted.replace(/[-\s]/g, "").length < 20) {
+			status.innerHTML += ` <span class="note-warn">${escapeHtml(ui.maybeScan)}</span>`;
+		}
+	} catch (err) {
+		status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+	clearBusy(runBtn);
+});
+
+	copyBtn.addEventListener("click", async () => {
+	try {
+		await navigator.clipboard.writeText(extracted);
+		copyBtn.textContent = ui.copied;
+		setTimeout(() => (copyBtn.textContent = ui.copy), 1500);
+	} catch {
+		out.select();
+		document.execCommand("copy");
+	}
+});
+	saveBtn.addEventListener("click", () => {
+	const blob = new Blob([extracted], { type: "text/plain;charset=utf-8" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = `${(file?.name || "document").replace(/\.pdf$/i, "")}.txt`;
+	a.click();
+	setTimeout(() => URL.revokeObjectURL(url), 4000);
+});
+</script>

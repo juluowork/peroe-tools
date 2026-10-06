@@ -9,6 +9,10 @@ import MergePdfTool from "../../components/tools/MergePdfTool.astro";
 import SplitPdfTool from "../../components/tools/SplitPdfTool.astro";
 import PdfToImagesTool from "../../components/tools/PdfToImagesTool.astro";
 import CompressPdfTool from "../../components/tools/CompressPdfTool.astro";
+import WatermarkPdfTool from "../../components/tools/WatermarkPdfTool.astro";
+import PageNumbersPdfTool from "../../components/tools/PageNumbersPdfTool.astro";
+import OrganizePdfTool from "../../components/tools/OrganizePdfTool.astro";
+import ExtractPdfTextTool from "../../components/tools/ExtractPdfTextTool.astro";
 import { getSite, getTools } from "../../i18n";
 import type { ToolCopy } from "../../i18n";
 
@@ -32,6 +36,10 @@ const components: Record<string, typeof CompressTool> = {
 	"split-pdf": SplitPdfTool,
 	"pdf-to-images": PdfToImagesTool,
 	"compress-pdf": CompressPdfTool,
+	"watermark-pdf": WatermarkPdfTool,
+	"page-numbers-pdf": PageNumbersPdfTool,
+	"organize-pdf": OrganizePdfTool,
+	"extract-pdf-text": ExtractPdfTextTool,
 };
 const Tool = components[tool.slug];
 ---

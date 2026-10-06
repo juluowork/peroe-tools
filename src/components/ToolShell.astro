@@ -1,0 +1,55 @@
+---
+import type { Locale, SiteCopy, ToolCopy } from "../i18n";
+import { categoryPath, localePath, toolIcon, toolPath, toolsByCategory } from "../i18n";
+import Icon from "./Icon.astro";
+
+interface Props {
+	locale: Locale;
+	site: SiteCopy;
+	tools: ToolCopy[];
+	/** 高亮项："all"（全部工具）/ "categories"（分类总览）/ 分类 id */
+	active: string;
+}
+const { locale, site, tools, active } = Astro.props;
+const groups = toolsByCategory(locale);
+---
+
+<div class="tool-shell">
+	<aside class="sidenav" aria-label={site.navCategories}>
+		<a class="sidenav-item sidenav-all" href={localePath(locale, "/tools/")} aria-current={active === "all" ? "page" : undefined}>
+			<Icon name="zap" size={16} />
+			<span>{site.navAllTools}</span>
+			<span class="count">{tools.length}</span>
+		</a>
+
+		<div class="sidenav-heading">{site.navCategories}</div>
+
+		{groups.map((g) => (
+			<div class="sidenav-group">
+				<a
+					class="sidenav-item"
+					href={categoryPath(locale, g.category.id)}
+					aria-current={active === g.category.id ? "page" : undefined}
+				>
+					<Icon name={toolIcon(g.tools[0].slug)} size={16} />
+					<span>{g.category.name}</span>
+					<span class="count">{g.tools.length}</span>
+				</a>
+				{active === g.category.id && (
+					<div class="sidenav-tools">
+						{g.tools.map((t) => <a href={toolPath(locale, t)}>{t.nav}</a>)}
+					</div>
+				)}
+			</div>
+		))}
+
+		<a class="sidenav-item sidenav-foot" href={localePath(locale, "/categories/")}>
+			<Icon name="pages" size={16} />
+			<span>{site.navCategories}</span>
+		</a>
+	</aside>
+
+	<div class="shell-main">
+		<slot />
+	</div>
+</div>

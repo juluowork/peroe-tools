@@ -4,6 +4,7 @@ import { categoryPath, localePath, toolPath, toolIcon } from "../i18n";
 import Base from "../layouts/Base.astro";
 import Icon from "./Icon.astro";
 import MoreTools from "./MoreTools.astro";
+import ToolShell from "./ToolShell.astro";
 
 interface Props {
 	locale: Locale;
@@ -81,22 +82,28 @@ const jsonLd = [
 		{category.intro.map((p) => <p>{p}</p>)}
 	</section>
 
-	<section>
-		<div class="section-head">
-			<h2>{category.name}</h2>
-			<span class="small muted">{inCategory.length} {locale === "en" ? "tools" : "个工具"}</span>
-		</div>
-		<div class="grid">
-			{inCategory.map((t) => (
-				<a class="card" href={toolPath(locale, t)}>
-					<div class="ico"><Icon name={toolIcon(t.slug)} size={32} /></div>
-					<h3>{t.nav}</h3>
-					<p>{t.blurb}</p>
-					<div class="cat">{category.name}</div>
-				</a>
-			))}
-		</div>
-	</section>
+	<ToolShell locale={locale} site={site} tools={tools} active={category.id}>
+		<section>
+			<div class="cat-block-head">
+				<h2>{category.name}</h2>
+				<span class="count">{inCategory.length} {locale === "en" ? "tools" : "个工具"}</span>
+			</div>
+			<ul class="toollist" style="margin-top:14px">
+				{inCategory.map((t) => (
+					<li>
+						<a href={toolPath(locale, t)}>
+							<span class="tl-ico"><Icon name={toolIcon(t.slug)} size={20} /></span>
+							<span class="tl-body">
+								<span class="tl-name">{t.nav}</span>
+								<span class="tl-desc">{t.blurb}</span>
+							</span>
+							<span class="tl-go">→</span>
+						</a>
+					</li>
+				))}
+			</ul>
+		</section>
+	</ToolShell>
 
 	<div class="ad-slot" data-ad-slot="category-mid"></div>
 

@@ -1,0 +1,177 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div class="options" id="options" hidden>
+		<label class="field"><span class="lbl">{ui.text}</span>
+			<input id="text" type="text" value="CONFIDENTIAL" />
+		</label>
+		<label class="field"><span class="lbl">{ui.layout}</span>
+			<select id="layout">
+				<option value="center">{ui.layoutCenter}</option>
+				<option value="tile">{ui.layoutTile}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.size} <b id="szv">48</b></span>
+			<input id="size" type="range" min="12" max="120" value="48" />
+		</label>
+		<label class="field"><span class="lbl">{ui.opacity} <b id="opv">15%</b></span>
+			<input id="opacity" type="range" min="4" max="80" value="15" />
+		</label>
+		<label class="field"><span class="lbl">{ui.color}</span>
+			<select id="color">
+				<option value="#d02020">Red</option>
+				<option value="#808080">Grey</option>
+				<option value="#1f6feb">Blue</option>
+				<option value="#111111">Black</option>
+			</select>
+		</label>
+	</div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, escapeHtml, formatBytes, opButton, renderRow, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const options = document.getElementById("options")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	const textIn = document.getElementById("text") as HTMLInputElement;
+	const layout = document.getElementById("layout") as HTMLSelectElement;
+	const sizeIn = document.getElementById("size") as HTMLInputElement;
+	const opacityIn = document.getElementById("opacity") as HTMLInputElement;
+	const colorIn = document.getElementById("color") as HTMLSelectElement;
+	let file: File | null = null;
+
+	const szv = document.getElementById("szv")!;
+	const opv = document.getElementById("opv")!;
+	sizeIn.addEventListener("input", () => (szv.textContent = sizeIn.value));
+	opacityIn.addEventListener("input", () => (opv.textContent = `${opacityIn.value}%`));
+
+	bindDropZone(dz, input, async (picked) => {
+		const pdf = picked.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+		if (!pdf) return;
+		file = pdf;
+		dz.classList.add("is-compact");
+		options.hidden = false;
+		actions.hidden = false;
+		list.innerHTML = "";
+		const li = renderRow({ name: pdf.name, sizeText: formatBytes(pdf.size) });
+		li.querySelector(".ops")!.append(
+			opButton(ui.remove, "danger", () => {
+				file = null;
+				list.innerHTML = "";
+				options.hidden = true;
+				actions.hidden = true;
+				status.textContent = "";
+				dz.classList.remove("is-compact");
+			}),
+		);
+		list.appendChild(li);
+	});
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		file = null;
+		list.innerHTML = "";
+		options.hidden = true;
+		actions.hidden = true;
+		status.textContent = "";
+		dz.classList.remove("is-compact");
+	});
+
+	/** 水印文字先画到 canvas —— 这样中文/emoji 都能用（pdf-lib 内置字体只支持拉丁字母） */
+	function makeStamp(text: string, px: number, color: string, opacity: number): HTMLCanvasElement {
+		const pad = Math.ceil(px * 0.4);
+		const c = document.createElement("canvas");
+		const ctx0 = c.getContext("2d")!;
+		const font = `bold ${px}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
+		ctx0.font = font;
+		const w = Math.ceil(ctx0.measureText(text).width) + pad * 2;
+		const h = Math.ceil(px * 1.6);
+		c.width = w;
+		c.height = h;
+		const ctx = c.getContext("2d")!;
+		ctx.font = font;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.globalAlpha = opacity;
+		ctx.fillStyle = color;
+		ctx.fillText(text, w / 2, h / 2);
+		return c;
+	}
+
+	runBtn.addEventListener("click", async () => {
+	if (!file) return;
+	setBusy(runBtn, ui.working);
+	status.textContent = "";
+	try {
+		const { PDFDocument, degrees } = await import("pdf-lib");
+		const { download } = await import("../../lib/imgtools.client");
+		const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+		const text = textIn.value.trim() || "CONFIDENTIAL";
+		const px = Number(sizeIn.value);
+		const opacity = Number(opacityIn.value) / 100;
+		const stamp = makeStamp(text, px, colorIn.value, opacity);
+		const png = await doc.embedPng(stamp.toDataURL("image/png"));
+		for (const page of doc.getPages()) {
+			const { width, height } = page.getSize();
+			if (layout.value === "tile") {
+				const stepX = png.width * 1.15;
+				const stepY = png.height * 1.6;
+				for (let y = -png.height; y < height + png.height; y += stepY) {
+					for (let x = -png.width; x < width + png.width; x += stepX) {
+						page.drawImage(png, { x, y, width: png.width, height: png.height, rotate: degrees(30), opacity: 1 });
+					}
+				}
+			} else {
+				const scale = Math.min(1, (Math.min(width, height) * 0.9) / png.width);
+				const w = png.width * scale;
+				const h = png.height * scale;
+				page.drawImage(png, {
+					x: (width - w) / 2,
+					y: (height - h) / 2,
+					width: w,
+					height: h,
+					rotate: degrees(45),
+				});
+			}
+		}
+		const bytes = await doc.save();
+		const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+		const name = file.name.replace(/\.pdf$/i, "-watermarked.pdf");
+		list.innerHTML = "";
+		const li = renderRow({ name, sizeText: `${doc.getPageCount()} ${ui.pages} · ${formatBytes(blob.size)}` });
+		li.querySelector(".ops")!.append(opButton(ui.download, "primary", () => download(blob, name)));
+		list.appendChild(li);
+		status.textContent = ui.done;
+	} catch (err) {
+		status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+	clearBusy(runBtn);
+});
+</script>

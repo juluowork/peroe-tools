@@ -1,0 +1,164 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+
+	<p class="small muted" id="hint" hidden style="margin-top:14px">
+		{ui.hint}
+	</p>
+	<div class="pagegrid" id="grid"></div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-ghost" id="reverse">{ui.reverse}</button>
+		<button class="btn-ghost" id="resetAll">{ui.resetOrder}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, escapeHtml, formatBytes, opButton, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const grid = document.getElementById("grid")!;
+	const hint = document.getElementById("hint")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	let file: File | null = null;
+	/** 每项：原始页序号（0 基）与旋转角 */
+	let pages: { index: number; rotation: number }[] = [];
+	let original: { index: number; rotation: number }[] = [];
+
+	async function renderGrid() {
+		grid.innerHTML = "";
+		if (!file || pages.length === 0) {
+			hint.hidden = true;
+			actions.hidden = true;
+			return;
+		}
+		hint.hidden = false;
+		actions.hidden = false;
+		const { openPdf, renderPageToCanvas } = await import("../../lib/pdfjs.client");
+		const open = await openPdf(await file.arrayBuffer());
+		for (let i = 0; i < pages.length; i++) {
+			const item = pages[i];
+			const tile = document.createElement("div");
+			tile.className = "pagetile";
+			const canvas = await renderPageToCanvas(open, item.index + 1, 0.45);
+			canvas.style.width = "100%";
+			canvas.style.height = "auto";
+			if (item.rotation) canvas.style.transform = `rotate(${item.rotation}deg)`;
+			tile.appendChild(canvas);
+			const bar = document.createElement("div");
+			bar.className = "pagetile-bar";
+			bar.append(
+				opButton(`${i + 1}`, "icon"),
+				opButton("↺", "icon", () => {
+					item.rotation = (item.rotation + 270) % 360;
+					renderGrid();
+				}),
+				opButton("↻", "icon", () => {
+					item.rotation = (item.rotation + 90) % 360;
+					renderGrid();
+				}),
+				opButton("←", "icon", () => {
+					if (i > 0) {
+						[pages[i - 1], pages[i]] = [pages[i], pages[i - 1]];
+						renderGrid();
+					}
+				}),
+				opButton("→", "icon", () => {
+					if (i < pages.length - 1) {
+						[pages[i + 1], pages[i]] = [pages[i], pages[i + 1]];
+						renderGrid();
+					}
+				}),
+				opButton("✕", "danger", () => {
+					pages.splice(i, 1);
+					renderGrid();
+				}),
+			);
+			tile.appendChild(bar);
+			grid.appendChild(tile);
+		}
+	}
+
+	bindDropZone(dz, input, async (picked) => {
+		const pdf = picked.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+		if (!pdf) return;
+		file = pdf;
+		dz.classList.add("is-compact");
+		status.textContent = "";
+		const { PDFDocument } = await import("pdf-lib");
+		const doc = await PDFDocument.load(await pdf.arrayBuffer(), { ignoreEncryption: true });
+		pages = doc.getPageIndices().map((index) => ({ index, rotation: 0 }));
+		original = pages.map((p) => ({ ...p }));
+		renderGrid();
+	});
+
+	document.getElementById("reverse")!.addEventListener("click", () => {
+		pages.reverse();
+		renderGrid();
+});
+	document.getElementById("resetAll")!.addEventListener("click", () => {
+		pages = original.map((p) => ({ ...p }));
+	renderGrid();
+});
+	document.getElementById("reset")!.addEventListener("click", () => {
+	file = null;
+	pages = [];
+	grid.innerHTML = "";
+	hint.hidden = true;
+	actions.hidden = true;
+	status.textContent = "";
+	dz.classList.remove("is-compact");
+});
+
+	runBtn.addEventListener("click", async () => {
+	if (!file || pages.length === 0) return;
+	setBusy(runBtn, ui.working);
+	status.textContent = "";
+	try {
+		const { PDFDocument, degrees } = await import("pdf-lib");
+		const { download } = await import("../../lib/imgtools.client");
+		const src = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+		const out = await PDFDocument.create();
+		const copied = await out.copyPages(src, pages.map((p) => p.index));
+		copied.forEach((page, i) => {
+			const rot = pages[i].rotation;
+			if (rot) {
+				const base = page.getRotation().angle;
+				page.setRotation(degrees((base + rot) % 360));
+			}
+			out.addPage(page);
+		});
+		const bytes = await out.save();
+		const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+		const name = file.name.replace(/\.pdf$/i, "-organized.pdf");
+		status.innerHTML = `${ui.done} · ${pages.length} ${ui.pages} · ${formatBytes(blob.size)}`;
+		const bar = document.createElement("div");
+		bar.className = "btns";
+		bar.append(opButton(ui.download, "primary", () => download(blob, name)));
+		status.appendChild(bar);
+	} catch (err) {
+		status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+	clearBusy(runBtn);
+});
+</script>

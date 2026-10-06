@@ -3,6 +3,7 @@ import type { Locale, SiteCopy, ToolCopy } from "../i18n";
 import { categoryPath, localePath, toolPath, toolsByCategory, toolIcon } from "../i18n";
 import Base from "../layouts/Base.astro";
 import Icon from "./Icon.astro";
+import ToolShell from "./ToolShell.astro";
 
 interface Props {
 	locale: Locale;
@@ -66,43 +67,46 @@ const jsonLd = [
 		/>
 	</div>
 
-	<div id="search-empty" class="empty" hidden>{site.searchEmpty}</div>
+	<ToolShell locale={locale} site={site} tools={tools} active="all">
+		<div id="search-empty" class="empty" hidden>{site.searchEmpty}</div>
 
-	{groups.map((g) => (
-		<section class="cat-section" id={g.category.id} data-cat={g.category.id}>
-			<div class="section-head">
-				<h2><a href={categoryPath(locale, g.category.id)}>{g.category.name}</a></h2>
-				<span class="small muted">{g.category.blurb}</span>
-				<a class="btn-link" href={categoryPath(locale, g.category.id)} style="margin-left:auto">
-					{locale === "en" ? "Category page" : "分类页"} →
-				</a>
-			</div>
-			<div class="grid">
-				{g.tools.map((t) => (
-					<a
-						class="card"
-						href={toolPath(locale, t)}
-						data-search={`${t.nav} ${t.blurb} ${t.keywords.join(" ")}`.toLowerCase()}
-					>
-						<div class="ico"><Icon name={toolIcon(t.slug)} size={32} /></div>
-						<h3>{t.nav}</h3>
-						<p>{t.blurb}</p>
-						<div class="cat">{categoryPath(locale, g.category.id) && g.category.name}</div>
+			{groups.map((g) => (
+			<section class="cat-section" id={g.category.id} data-cat={g.category.id}>
+				<div class="section-head">
+					<h2><a href={categoryPath(locale, g.category.id)}>{g.category.name}</a></h2>
+					<span class="small muted">{g.category.blurb}</span>
+					<a class="btn-link" href={categoryPath(locale, g.category.id)} style="margin-left:auto">
+						{locale === "en" ? "Category page" : "分类页"} →
 					</a>
-				))}
-			</div>
-		</section>
-	))}
+				</div>
+				<div class="grid">
+					{g.tools.map((t) => (
+						<a
+							class="card"
+							href={toolPath(locale, t)}
+							data-search={`${t.nav} ${t.blurb} ${t.keywords.join(" ")}`.toLowerCase()}
+						>
+							<div class="ico"><Icon name={toolIcon(t.slug)} size={32} /></div>
+							<h3>{t.nav}</h3>
+							<p>{t.blurb}</p>
+							<div class="cat">{categoryPath(locale, g.category.id) && g.category.name}</div>
+						</a>
+					))}
+				</div>
+			</section>
+		))}
 
-	<section class="prose">
-		<h2>{locale === "en" ? "More tools are on the way" : "还有更多工具在路上"}</h2>
-		<p>
-			{locale === "en"
-				? "This site is built to grow: the navigation groups tools by category, so image, PDF, developer, text and network utilities all stay findable as the list gets longer. New tools appear here as soon as they ship — nothing to install, and still no uploads."
-				: "这个站点是奔着「变多」设计的：导航按分类组织，等图片、PDF、开发、文本、网络这些工具都堆起来时依然找得到。新工具一上线就会出现在这里，不用安装任何东西，也依然不上传文件。"}
-		</p>
-		<div class="ad-slot" data-ad-slot="tools-mid"></div>
-	</section>
+		<section class="prose">
+			<h2>{locale === "en" ? "More tools are on the way" : "还有更多工具在路上"}</h2>
+			<p>
+				{locale === "en"
+					? "This site is built to grow: the navigation groups tools by category, so image, PDF, developer, text and network utilities all stay findable as the list gets longer. New tools appear here as soon as they ship — nothing to install, and still no uploads."
+					: "这个站点是奔着「变多」设计的：导航按分类组织，等图片、PDF、开发、文本、网络这些工具都堆起来时依然找得到。新工具一上线就会出现在这里，不用安装任何东西，也依然不上传文件。"}
+			</p>
+			<div class="ad-slot" data-ad-slot="tools-mid"></div>
+		</section>
+	</ToolShell>
+
 </Base>
 
 <script>

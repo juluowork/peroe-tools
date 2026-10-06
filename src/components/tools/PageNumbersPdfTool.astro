@@ -1,0 +1,139 @@
+---
+import type { ToolCopy } from "../../i18n";
+import DropZone from "../DropZone.astro";
+
+interface Props {
+	ui: ToolCopy["ui"];
+	privacy: string;
+}
+const { ui, privacy } = Astro.props;
+---
+
+<script type="application/json" id="tool-ui" set:html={JSON.stringify(ui)} />
+
+<div class="tool">
+	<DropZone id="dz" title={ui.dropzone} sub={ui.orDrop} privacy={privacy} />
+	<input id="file" type="file" accept="application/pdf,.pdf" hidden />
+
+	<ul class="filelist" id="list"></ul>
+
+	<div class="options" id="options" hidden>
+		<label class="field"><span class="lbl">{ui.position}</span>
+			<select id="pos">
+				<option value="bc">{ui.posBC}</option>
+				<option value="br">{ui.posBR}</option>
+				<option value="bl">{ui.posBL}</option>
+				<option value="tc">{ui.posTC}</option>
+				<option value="tr">{ui.posTR}</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.format}</span>
+			<select id="fmt">
+				<option value="n">1</option>
+				<option value="page-n">Page 1</option>
+				<option value="n-of-total">1 / 10</option>
+				<option value="page-n-of-total">Page 1 of 10</option>
+			</select>
+		</label>
+		<label class="field"><span class="lbl">{ui.startAt}</span>
+			<input id="start" type="number" min="1" step="1" value="1" />
+		</label>
+		<label class="field"><span class="lbl">{ui.fontSize}</span>
+			<input id="fsize" type="number" min="6" max="24" step="1" value="10" />
+		</label>
+	</div>
+
+	<div class="btns" id="actions" hidden>
+		<button class="btn-primary" id="run">{ui.run}</button>
+		<button class="btn-link" id="reset">{ui.startOver}</button>
+	</div>
+	<p class="empty" id="status"></p>
+</div>
+
+<script>
+	import { bindDropZone, clearBusy, escapeHtml, formatBytes, opButton, renderRow, setBusy } from "../../lib/imgtools.client";
+
+	const ui = JSON.parse(document.getElementById("tool-ui")!.textContent || "{}");
+	const dz = document.getElementById("dz")!;
+	const input = document.getElementById("file") as HTMLInputElement;
+	const list = document.getElementById("list")!;
+	const options = document.getElementById("options")!;
+	const actions = document.getElementById("actions")!;
+	const runBtn = document.getElementById("run") as HTMLButtonElement;
+	const status = document.getElementById("status")!;
+	let file: File | null = null;
+
+	bindDropZone(dz, input, (picked) => {
+		const pdf = picked.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+		if (!pdf) return;
+		file = pdf;
+		dz.classList.add("is-compact");
+		options.hidden = false;
+		actions.hidden = false;
+		list.innerHTML = "";
+		const li = renderRow({ name: pdf.name, sizeText: formatBytes(pdf.size) });
+		li.querySelector(".ops")!.append(
+			opButton(ui.remove, "danger", () => {
+				file = null;
+				list.innerHTML = "";
+				options.hidden = true;
+				actions.hidden = true;
+				status.textContent = "";
+				dz.classList.remove("is-compact");
+			}),
+		);
+		list.appendChild(li);
+	});
+
+	document.getElementById("reset")!.addEventListener("click", () => {
+		file = null;
+		list.innerHTML = "";
+		options.hidden = true;
+		actions.hidden = true;
+		status.textContent = "";
+		dz.classList.remove("is-compact");
+	});
+
+	runBtn.addEventListener("click", async () => {
+	if (!file) return;
+	setBusy(runBtn, ui.working);
+	status.textContent = "";
+	try {
+		const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+		const { download } = await import("../../lib/imgtools.client");
+		const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+		const font = await doc.embedFont(StandardFonts.Helvetica);
+		const size = Math.max(6, Number((document.getElementById("fsize") as HTMLInputElement).value || 10));
+		const start = Math.max(1, Number((document.getElementById("start") as HTMLInputElement).value || 1));
+		const fmt = (document.getElementById("fmt") as HTMLSelectElement).value;
+		const pos = (document.getElementById("pos") as HTMLSelectElement).value;
+		const pages = doc.getPages();
+		pages.forEach((page, i) => {
+			const num = i + start;
+			const total = pages.length + start - 1;
+			const label =
+				fmt === "n" ? `${num}` :
+				fmt === "page-n" ? `Page ${num}` :
+				fmt === "n-of-total" ? `${num} / ${total}` :
+				`Page ${num} of ${total}`;
+			const { width, height } = page.getSize();
+			const tw = font.widthOfTextAtSize(label, size);
+			const m = 28;
+			const y = pos.startsWith("b") ? m : height - m - size;
+			const x = pos.endsWith("c") ? (width - tw) / 2 : pos.endsWith("r") ? width - m - tw : m;
+			page.drawText(label, { x, y, size, font, color: rgb(0.25, 0.28, 0.33) });
+		});
+		const bytes = await doc.save();
+		const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+		const name = file.name.replace(/\.pdf$/i, "-numbered.pdf");
+		list.innerHTML = "";
+		const li = renderRow({ name, sizeText: `${pages.length} ${ui.pages} · ${formatBytes(blob.size)}` });
+		li.querySelector(".ops")!.append(opButton(ui.download, "primary", () => download(blob, name)));
+		list.appendChild(li);
+		status.textContent = ui.done;
+	} catch (err) {
+		status.innerHTML = `<span class="note-warn">${escapeHtml(ui.failed)}: ${escapeHtml((err as Error).message)}</span>`;
+	}
+	clearBusy(runBtn);
+});
+</script>
