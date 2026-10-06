@@ -15,6 +15,7 @@
 | --- | --- | --- |
 | `/` | `/zh/` | 首页 |
 | `/tools/` | `/zh/tools/` | **全部工具**：搜索框 + 按分类分组 |
+| `/categories/` | `/zh/categories/` | **分类索引**：所有分类一屏看全，点进分类枢纽页 |
 | `/image/` | `/zh/image/` | **分类枢纽页**（该分类全部工具 + 分类说明 + FAQ） |
 | `/pdf/` | `/zh/pdf/` | 同上 |
 | `/image/compress-image/` | `/zh/image/compress-image/` | 工具页 = `/{category}/{slug}/` |
@@ -24,7 +25,11 @@
 | 图片压缩（画质 / 目标体积 / 批量） | `/image/compress-image/` | Canvas `toBlob()` |
 | 格式转换（JPG / PNG / WebP / AVIF） | `/image/convert-image/` | Canvas `toBlob()` |
 | 缩放（锁比例 / 批量） | `/image/resize-image/` | Canvas `drawImage()` |
-| 多图合成 PDF | `/pdf/image-to-pdf/` | `pdf-lib`（按需加载） |
+| 图片合成 PDF | `/pdf/image-to-pdf/` | `pdf-lib`（按需加载） |
+| **PDF 合并**（多文件、可排序） | `/pdf/merge-pdf/` | `pdf-lib` `copyPages()` |
+| **PDF 拆分**（页码范围 / 每页一份） | `/pdf/split-pdf/` | `pdf-lib` + 范围解析 |
+| **PDF 转图片**（JPG/PNG/WebP、1x-3x） | `/pdf/pdf-to-images/` | `pdf.js` 渲染 + Canvas 编码 |
+| **PDF 压缩**（重编码为优化 JPEG） | `/pdf/compress-pdf/` | `pdf.js` + `pdf-lib` |
 
 - **slug 一律英文**（两种语言共用，便于权重集中），中文只体现在展示文案与 `/zh/` 前缀。
 - 旧版本用过扁平 URL（`/compress-image/`），**已在 `public/_redirects` 里 301 到新地址**；`/en/*` 同理。

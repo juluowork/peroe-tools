@@ -116,7 +116,7 @@ export const site: SiteCopy = {
 			intro: [
 				"PDF is what you send when a document has to look the same everywhere: receipts for an expense claim, scans for an application, photos of a whiteboard for a client. Doing that conversion locally matters because these are exactly the files you would rather not hand to a stranger's server.",
 				"Pages are embedded from your original pixels, so quality depends on your source images — 200-300 DPI scans for anything with text you need to read. Image-sized pages avoid white borders on mixed portrait and landscape sets, while A4 or Letter suits printing and mixing with other documents.",
-				"More PDF utilities — merging several PDFs, splitting and reordering pages, watermarks and compression — are next on the list. They will appear on this page, and they will work the same way: in your browser, with no upload.",
+				"Everything here works the same way: pages are handled by your own browser, with no upload and no account. Merge several PDFs, split or extract page ranges, render pages as JPG/PNG/WebP, and shrink scanned documents — all in this category. Watermarks, page numbers and text extraction are next.",
 			],
 			faq: [
 				{
