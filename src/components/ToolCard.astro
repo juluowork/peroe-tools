@@ -1,6 +1,6 @@
 ---
 import type { Locale, ToolCopy } from "../i18n";
-import { localePath } from "../i18n";
+import { toolPath } from "../i18n";
 import Icon from "./Icon.astro";
 
 interface Props {
@@ -13,7 +13,7 @@ const iconName =
 const category = tool.slug === "image-to-pdf" ? "PDF" : locale === "en" ? "Image" : "图片";
 ---
 
-<a class="card" href={localePath(locale, `/${tool.slug}/`)}>
+<a class="card" href={toolPath(locale, tool)}>
 	<div class="ico"><Icon name={iconName} size={32} /></div>
 	<h3>{tool.nav}</h3>
 	<p>{tool.blurb}</p>

@@ -9,14 +9,41 @@
 
 ## 工具与语言
 
-| 路径（英文） | 中文路径 | 工具 | 实现 |
-| --- | --- | --- | --- |
-| `/compress-image/` | `/zh/compress-image/` | 图片压缩（画质 / 目标体积 / 批量） | Canvas `toBlob()` |
-| `/convert-image/` | `/zh/convert-image/` | 格式转换（JPG / PNG / WebP / AVIF） | Canvas `toBlob()` |
-| `/resize-image/` | `/zh/resize-image/` | 按像素或百分比缩放（锁比例 / 批量） | Canvas `drawImage()` |
-| `/image-to-pdf/` | `/zh/image-to-pdf/` | 多图合成 PDF（排序 / 页面尺寸 / 边距） | `pdf-lib`（按需加载） |
+### URL 规则（分类进 URL）
 
-语言策略：**英文在根路径，中文在 `/zh/`**，两边都有 `hreflang` 互指；旧的 `/en/*` 做 301 别名。
+| 英文 | 中文 | 说明 |
+| --- | --- | --- |
+| `/` | `/zh/` | 首页 |
+| `/tools/` | `/zh/tools/` | **全部工具**：搜索框 + 按分类分组 |
+| `/image/` | `/zh/image/` | **分类枢纽页**（该分类全部工具 + 分类说明 + FAQ） |
+| `/pdf/` | `/zh/pdf/` | 同上 |
+| `/image/compress-image/` | `/zh/image/compress-image/` | 工具页 = `/{category}/{slug}/` |
+
+| 工具 | 新路径 | 实现 |
+| --- | --- | --- |
+| 图片压缩（画质 / 目标体积 / 批量） | `/image/compress-image/` | Canvas `toBlob()` |
+| 格式转换（JPG / PNG / WebP / AVIF） | `/image/convert-image/` | Canvas `toBlob()` |
+| 缩放（锁比例 / 批量） | `/image/resize-image/` | Canvas `drawImage()` |
+| 多图合成 PDF | `/pdf/image-to-pdf/` | `pdf-lib`（按需加载） |
+
+- **slug 一律英文**（两种语言共用，便于权重集中），中文只体现在展示文案与 `/zh/` 前缀。
+- 旧版本用过扁平 URL（`/compress-image/`），**已在 `public/_redirects` 里 301 到新地址**；`/en/*` 同理。
+- 决定"分类进 URL"的原因：URL 自带分类关键词，并顺带产出可索引的分类枢纽页 `/image/`——
+  等于拿到"独立子域"的 SEO 收益，却不用把新域本来就不多的权重切成几份。
+- 分类展示名（英文 / 中文）：Image 图片 · PDF · Developer 开发 · Text 文本 · Converter 转换 · Web 网络。
+  **只显示"有工具的分类"**（`activeCategories()`），避免出现空页面。
+
+## 信息架构（工具变多也不会找不到）
+
+- **顶栏**：首页 · 分类（≤4 个直接平铺）· 全部工具（下拉里按分类列全部工具）· 语言切换。
+  **不放**几十个工具直链、登录、收藏、广告。
+- **`/tools/`**：客户端搜索（匹配工具名 + 关键词 + 描述，命中即过滤，支持 `?q=` 与 `⌘K`/`Ctrl+K` 聚焦）
+  + 按分类分组；空结果显示提示。搜索是纯前端的，构建产物自带索引，无服务端。
+- **分类枢纽页** `/{category}/`：分类导语（2-3 段实质内容）+ 工具卡 + FAQ + 其它分类的工具。
+- **工具页**：面包屑 `首页 / 分类 / 工具` + `BreadcrumbList` 结构化数据；页尾"相关工具"**同分类优先**。
+- **新增工具的标准动作**：① 在 `src/i18n/{en,zh}.ts` 加一条 ToolCopy（含 `category`、`keywords`）；
+  ② 在 `src/components/tools/` 写界面组件；③ 在 `src/pages/[category]/[slug].astro` 的 components 映射里登记。
+  导航、下拉、`/tools/` 分组、sitemap、面包屑、相关工具**全部自动跟随**。
 
 ## 项目结构
 

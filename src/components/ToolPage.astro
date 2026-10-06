@@ -1,6 +1,6 @@
 ---
 import type { Locale, SiteCopy, ToolCopy } from "../i18n";
-import { localePath } from "../i18n";
+import { categoryPath, localePath, toolPath } from "../i18n";
 import Base from "../layouts/Base.astro";
 import Icon from "./Icon.astro";
 import MoreTools from "./MoreTools.astro";
@@ -12,8 +12,11 @@ interface Props {
 	tool: ToolCopy;
 }
 const { locale, site, tools, tool } = Astro.props;
-const path = `/${tool.slug}/`;
-const others = tools.filter((t) => t.slug !== tool.slug);
+const path = `/${tool.category}/${tool.slug}/`;
+const category = site.categories.find((c) => c.id === tool.category);
+// 相关工具：同分类优先，不足再补其它分类
+const sameCat = tools.filter((t) => t.category === tool.category && t.slug !== tool.slug);
+const others = [...sameCat, ...tools.filter((t) => t.category !== tool.category && t.slug !== tool.slug)];
 const origin = "https://tools.juluo.work";
 
 const jsonLd = [
@@ -40,7 +43,13 @@ const jsonLd = [
 		"@type": "BreadcrumbList",
 		itemListElement: [
 			{ "@type": "ListItem", position: 1, name: site.brand, item: origin + localePath(locale, "/") },
-			{ "@type": "ListItem", position: 2, name: tool.nav, item: origin + localePath(locale, path) },
+			{
+				"@type": "ListItem",
+				position: 2,
+				name: category?.name ?? tool.nav,
+				item: origin + categoryPath(locale, tool.category),
+			},
+			{ "@type": "ListItem", position: 3, name: tool.nav, item: origin + toolPath(locale, tool) },
 		],
 	},
 ];
@@ -59,6 +68,12 @@ const jsonLd = [
 		<div class="crumbs">
 			<a href={localePath(locale, "/")}><Icon name="home" size={14} /></a>
 			<span>/</span>
+			{category && (
+				<>
+					<a href={categoryPath(locale, category.id)}>{category.name}</a>
+					<span>/</span>
+				</>
+			)}
 			<span>{tool.nav}</span>
 		</div>
 		<h1>{tool.h1}</h1>

@@ -8,10 +8,13 @@ import ImageToPdfTool from "../../components/tools/ImageToPdfTool.astro";
 import { getSite, getTools } from "../../i18n";
 import type { ToolCopy } from "../../i18n";
 
-const locale = "zh" as const;
+const locale = "en" as const;
 
 export const getStaticPaths = (() =>
-	getTools("zh").map((tool) => ({ params: { slug: tool.slug }, props: { tool } }))) satisfies GetStaticPaths;
+	getTools("en").map((tool) => ({
+		params: { category: tool.category, slug: tool.slug },
+		props: { tool },
+	}))) satisfies GetStaticPaths;
 
 const { tool } = Astro.props as { tool: ToolCopy };
 const site = getSite(locale);

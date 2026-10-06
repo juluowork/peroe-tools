@@ -1,6 +1,6 @@
 ---
 import type { Locale, SiteCopy, ToolCopy } from "../i18n";
-import { localePath } from "../i18n";
+import { activeCategories, categoryPath, localePath, toolPath, toolsByCategory } from "../i18n";
 import Base from "../layouts/Base.astro";
 import Icon from "./Icon.astro";
 
@@ -20,6 +20,8 @@ const categories: Record<string, string> = {
 const cats = locale === "en"
 	? [["all", "All"], ["Image", "Image"], ["PDF", "PDF"]]
 	: [["all", "全部"], ["Image", "图片"], ["PDF", "PDF"]];
+const groups = toolsByCategory(locale);
+const catCount = activeCategories(locale).length;
 
 const jsonLd = [
 	{
@@ -62,7 +64,18 @@ const jsonLd = [
 	</div>
 
 	<section>
-		<div class="section-head"><h2>{site.toolsTitle}</h2></div>
+		<div class="section-head">
+			<h2>{site.toolsTitle}</h2>
+			<span class="small muted">
+				{groups.map((g, i) => (
+					<>
+						{i > 0 && " · "}
+						<a href={categoryPath(locale, g.category.id)}>{g.category.name} ({g.tools.length})</a>
+					</>
+				))}
+			</span>
+			<a class="btn-link" href={localePath(locale, "/tools/")} style="margin-left:auto">{site.navAllTools} →</a>
+		</div>
 		<div class="tabs" id="tabs">
 			{cats.map(([value, label], i) => (
 				<button type="button" data-cat={value} aria-pressed={i === 0 ? "true" : "false"}>{label}</button>
@@ -70,13 +83,15 @@ const jsonLd = [
 		</div>
 		<div class="grid" id="toolgrid">
 			{tools.map((t) => (
-				<a class="card" href={localePath(locale, `/${t.slug}/`)} data-cat={categories[t.slug] ?? "Image"}>
+				<a class="card" href={toolPath(locale, t)} data-cat={categories[t.slug] ?? "Image"}>
 					<div class="ico">
 						<Icon name={t.slug === "image-to-pdf" ? "pdf" : t.slug === "convert-image" ? "convert" : t.slug === "resize-image" ? "resize" : "image"} size={32} />
 					</div>
 					<h3>{t.nav}</h3>
 					<p>{t.blurb}</p>
-					<div class="cat">{categories[t.slug]}</div>
+					<div class="cat">
+						{site.categories.find((c) => c.id === t.category)?.name ?? categories[t.slug]}
+					</div>
 				</a>
 			))}
 		</div>

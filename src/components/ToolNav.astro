@@ -1,0 +1,70 @@
+---
+import type { Locale, SiteCopy, ToolCopy } from "../i18n";
+import { categoryPath, localePath, toolPath, toolsByCategory } from "../i18n";
+import Icon from "./Icon.astro";
+
+interface Props {
+	locale: Locale;
+	site: SiteCopy;
+	tools: ToolCopy[];
+	/** 当前页面路径（不含语言前缀），用于高亮与语言切换 */
+	path: string;
+}
+const { locale, site, tools, path } = Astro.props;
+const groups = toolsByCategory(locale);
+const other: Locale = locale === "en" ? "zh" : "en";
+const href = (p: string) => localePath(locale, p);
+const onToolsPage = path.startsWith("/tools");
+---
+
+<nav class="site-nav" aria-label={site.navLabel}>
+	<a href={href("/")} aria-current={path === "/" ? "page" : undefined}>{locale === "en" ? "Home" : "首页"}</a>
+
+	{groups.slice(0, 4).map((g) => (
+		<a href={categoryPath(locale, g.category.id)} aria-current={path === `/${g.category.id}/` ? "page" : undefined}>
+			{g.category.name}
+		</a>
+	))}
+
+	<details class="nav-drop" id="nav-drop">
+		<summary aria-current={onToolsPage ? "page" : undefined}>
+			{site.navAllTools}
+			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+				<path d="m6 9 6 6 6-6" />
+			</svg>
+		</summary>
+		<div class="nav-panel">
+			<div class="nav-panel-inner">
+				{groups.map((g) => (
+					<div class="nav-col">
+						<a class="nav-col-title" href={categoryPath(locale, g.category.id)}>{g.category.name}</a>
+						{g.tools.map((t) => (
+							<a class="nav-item" href={toolPath(locale, t)}>{t.nav}</a>
+						))}
+					</div>
+				))}
+				<div class="nav-col nav-col--cta">
+					<a class="nav-col-title" href={href("/tools")}>{site.navAllTools}</a>
+					<p class="small muted" style="margin:0 0 8px">{site.toolsPageLead}</p>
+					<span class="pill">{tools.length} {locale === "en" ? "tools live" : "个工具已上线"}</span>
+				</div>
+			</div>
+		</div>
+	</details>
+
+	<a class="lang-switch" href={localePath(other, path)}>{site.switchLabel}</a>
+</nav>
+
+<script>
+	// 点击外部或按 Esc 关闭下拉；点击面板内链接后也收起
+	const drop = document.getElementById("nav-drop") as HTMLDetailsElement | null;
+	if (drop) {
+		document.addEventListener("click", (e) => {
+			if (drop.open && !drop.contains(e.target as Node)) drop.open = false;
+		});
+		document.addEventListener("keydown", (e) => {
+			if (e.key === "Escape") drop.open = false;
+		});
+		drop.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => (drop.open = false)));
+	}
+</script>

@@ -210,3 +210,49 @@ details.faq p { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
 	.tool { padding: 16px; }
 	.dropzone { padding: 30px 14px; }
 }
+
+/* ---------- 顶栏分类下拉 ---------- */
+.nav-drop { position: relative; }
+.nav-drop > summary {
+	list-style: none; cursor: pointer; padding: 7px 11px; border-radius: var(--radius-btn);
+	font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px;
+}
+.nav-drop > summary::-webkit-details-marker { display: none; }
+.nav-drop > summary:hover, .nav-drop[open] > summary { background: var(--soft); color: var(--fg); }
+.nav-panel {
+	position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+	background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card);
+	box-shadow: var(--shadow-lg); padding: 18px; z-index: 30; min-width: 520px;
+}
+.nav-panel-inner { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 18px; }
+.nav-col-title { display: block; font-size: 12px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.nav-col-title:hover { color: var(--brand-dark); }
+.nav-item { display: block; padding: 5px 8px; margin-left: -8px; border-radius: 7px; font-size: 14px; color: var(--fg); }
+.nav-item:hover { background: var(--soft); color: var(--brand-dark); }
+.nav-col--cta { border-left: 1px solid var(--line); padding-left: 18px; }
+.site-nav a[aria-current="page"] { color: var(--fg); font-weight: 600; }
+
+/* ---------- 全部工具页：搜索 + 分类 ---------- */
+.searchbar {
+	display: flex; align-items: center; gap: 10px; margin: 20px 0 8px;
+	border: 1px solid var(--line); border-radius: var(--radius-card); padding: 0 14px;
+	background: var(--bg); box-shadow: var(--shadow); color: var(--faint);
+}
+.searchbar:focus-within { border-color: var(--brand); }
+.searchbar input { border: none; background: none; min-height: 50px; font-size: 16px; width: 100%; color: var(--fg); }
+.searchbar input:focus { outline: none; }
+.cat-section { scroll-margin-top: 80px; }
+.cat-section .section-head { margin-bottom: 14px; }
+
+/* ---------- 分类胶囊（首页） ---------- */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+.chip {
+	border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 14px;
+	color: var(--muted); background: var(--bg);
+}
+.chip:hover { border-color: var(--brand); color: var(--brand-dark); }
+.footer-links { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 720px) {
+	.nav-panel { left: auto; right: 0; transform: none; min-width: 0; width: min(92vw, 420px); }
+	.nav-col--cta { border-left: none; padding-left: 0; }
+}

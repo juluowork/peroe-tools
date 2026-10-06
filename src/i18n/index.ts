@@ -35,3 +35,35 @@ export function altPath(locale: Locale, pathname: string): string {
 export function htmlLang(locale: Locale): string {
 	return locale === "en" ? "en" : "zh-CN";
 }
+
+/** 该语言下「有工具的分类」（按 categories 里定义的顺序；空分类不显示，避免出现空页面） */
+export function activeCategories(locale: Locale) {
+	const tools = getTools(locale);
+	return getSite(locale).categories.filter((c) => tools.some((t) => t.category === c.id));
+}
+
+/** 按分类分组（只返回有工具的分类） */
+export function toolsByCategory(locale: Locale) {
+	return activeCategories(locale).map((c) => ({
+		category: c,
+		tools: getTools(locale).filter((t) => t.category === c.id),
+	}));
+}
+
+export const categoryName = (locale: Locale, id: string): string =>
+	getSite(locale).categories.find((c) => c.id === id)?.name ?? id;
+
+/** 工具页路径：/{category}/{slug}/（分类进 URL，自带关键词，也顺带产出分类枢纽页） */
+export function toolPath(locale: Locale, tool: { category: string; slug: string }): string {
+	return localePath(locale, `/${tool.category}/${tool.slug}/`);
+}
+
+/** 分类枢纽页路径：/{category}/ */
+export function categoryPath(locale: Locale, categoryId: string): string {
+	return localePath(locale, `/${categoryId}/`);
+}
+
+/** 去掉语言前缀后的「逻辑路径」（用于语言切换与 canonical） */
+export function logicalPath(pathname: string): string {
+	return pathname.replace(/^\/zh(?=\/|$)/, "") || "/";
+}

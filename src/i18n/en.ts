@@ -56,11 +56,88 @@ export const site: SiteCopy = {
 	footerNote: "Files are processed on your device and never uploaded.",
 	footerLinks: [{ label: "Blog", href: "https://blog.peroe.cn/" }],
 	privacyLine: "No cookies, no tracking pixels, no accounts.",
+	navAllTools: "All tools",
+	searchPlaceholder: "Search tools — try “pdf”, “webp”, “resize”…",
+	searchEmpty: "No tool matches that. Browse the categories below.",
+	toolsPageTitle: "All Tools — Free Image, PDF & Developer Utilities",
+	toolsPageDescription:
+		"Every tool on peroe tools in one place: compress and convert images, build PDFs, plus developer and text utilities as they ship. All run locally in your browser.",
+	toolsPageH1: "All tools",
+	toolsPageLead:
+		"Everything runs in your browser, so nothing is uploaded. Use the search box or jump to a category.",
+	relatedTitle: "Related tools",
+	contactLabel: "Contact",
+	email: "juluo@juluo.work",
+	toolCountLabel: "{n} tools",
+	categories: [
+		{
+			id: "image",
+			name: "Image",
+			blurb: "Compress, convert and resize pictures without uploading them.",
+			h1: "Image tools that never upload your pictures",
+			metaTitle: "Image Tools — Compress, Convert & Resize Without Uploading",
+			metaDescription:
+				"Free image tools that run entirely in your browser: compress JPG/PNG/WebP, convert formats, and resize by pixels or percent. Nothing is uploaded, no sign-up.",
+			intro: [
+				"Photos, screenshots, scanned documents and design exports all need the same three things sooner or later: a smaller file, a different format, and the right dimensions. These tools do exactly that — and unlike most online converters, your image never leaves your device.",
+				"The processing happens in your browser through Canvas and WebAssembly, so a passport scan, a client contract or an unreleased mock-up stays on your machine. Re-encoding drops EXIF metadata (including GPS coordinates) as a side effect, which is usually what you want before publishing.",
+				"Typical results: photos shrink 40-70% at 80% quality, switching to WebP adds another 25-35%, and resizing a 4000px photo to the 1600px you actually display removes roughly six times the bytes.",
+			],
+			faq: [
+				{
+					q: "Which image formats are supported?",
+					a: "Anything your browser can decode — in practice JPG, PNG, WebP, AVIF, GIF and BMP on modern browsers, plus HEIC on Safari. Output is limited to what the browser can encode: JPG, PNG, WebP and AVIF.",
+				},
+				{
+					q: "Is there a file size or usage limit?",
+					a: "No. There is no upload, no queue and no account, so the only limit is your device memory. Dozens of photos can be processed in one batch.",
+				},
+				{
+					q: "Does compressing remove location data?",
+					a: "Yes. Re-encoding through Canvas strips EXIF, including GPS coordinates. Keep the original file if you need that metadata.",
+				},
+			],
+		},
+		{
+			id: "pdf",
+			name: "PDF",
+			blurb: "Build and edit PDF documents from your own files, locally.",
+			h1: "PDF tools that keep your documents on your device",
+			metaTitle: "PDF Tools — Build PDFs From Images Locally, No Upload",
+			metaDescription:
+				"Free PDF tools that run in your browser: combine photos and scans into one ordered PDF, choose A4, Letter or image-sized pages, add margins. Files are never uploaded.",
+			intro: [
+				"PDF is what you send when a document has to look the same everywhere: receipts for an expense claim, scans for an application, photos of a whiteboard for a client. Doing that conversion locally matters because these are exactly the files you would rather not hand to a stranger's server.",
+				"Pages are embedded from your original pixels, so quality depends on your source images — 200-300 DPI scans for anything with text you need to read. Image-sized pages avoid white borders on mixed portrait and landscape sets, while A4 or Letter suits printing and mixing with other documents.",
+				"More PDF utilities — merging several PDFs, splitting and reordering pages, watermarks and compression — are next on the list. They will appear on this page, and they will work the same way: in your browser, with no upload.",
+			],
+			faq: [
+				{
+					q: "Is it safe for ID documents, contracts and invoices?",
+					a: "Yes — that is the point of doing it locally. The images and the generated PDF exist only in your browser memory, the page has no upload endpoint, and it keeps working with the network switched off.",
+				},
+				{
+					q: "What page sizes can I use?",
+					a: "Match each image (no borders, best for mixed orientation), A4, or Letter, with an optional margin in points.",
+				},
+				{
+					q: "Which image formats can go into the PDF?",
+					a: "JPG and PNG are embedded directly; WebP, AVIF, GIF and anything else the browser can decode is converted to PNG first, then embedded.",
+				},
+			],
+		},
+		{ id: "convert", name: "Converters", blurb: "Move data between formats: units, encodings, file types.", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+		{ id: "dev", name: "Developer", blurb: "Everyday utilities for coding: JSON, Base64, regex, timestamps.", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+		{ id: "text", name: "Text", blurb: "Clean up, count, compare and transform text.", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+		{ id: "web", name: "Web & network", blurb: "Inspect URLs, headers, DNS and certificates.", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+	],
 };
 
 export const tools: ToolCopy[] = [
 	{
 		slug: "compress-image",
+		category: "image",
+		keywords: ["compress", "compress image", "reduce file size", "optimize", "shrink", "jpg", "jpeg", "png", "webp", "photo", "压缩", "图片压缩"],
 		icon: "M4 4h16v16H4z M9 13l2.5-3 2 2.5L16 9l3 5z",
 		accent: "#2563eb",
 		nav: "Compress",
@@ -125,6 +202,8 @@ export const tools: ToolCopy[] = [
 	},
 	{
 		slug: "convert-image",
+		category: "image",
+		keywords: ["convert", "image converter", "jpg", "jpeg", "png", "webp", "avif", "heic", "format", "transparency", "alpha", "格式转换", "转格式"],
 		icon: "M4 7h7v10H4z M13 7h7v10h-7z M11 12h2",
 		accent: "#7c3aed",
 		nav: "Convert",
@@ -180,6 +259,8 @@ export const tools: ToolCopy[] = [
 	},
 	{
 		slug: "resize-image",
+		category: "image",
+		keywords: ["resize", "resize image", "scale", "dimensions", "width", "height", "aspect ratio", "crop", "缩放", "改尺寸", "图片尺寸"],
 		icon: "M4 4h9v9H4z M11 11h9v9h-9z",
 		accent: "#0891b2",
 		nav: "Resize",
@@ -234,6 +315,8 @@ export const tools: ToolCopy[] = [
 	},
 	{
 		slug: "image-to-pdf",
+		category: "pdf",
+		keywords: ["image to pdf", "jpg to pdf", "png to pdf", "photos to pdf", "scan to pdf", "merge images", "a4", "图片转pdf", "照片转pdf", "合并pdf"],
 		icon: "M6 3h8l4 4v14H6z M14 3v5h5",
 		accent: "#dc2626",
 		nav: "To PDF",

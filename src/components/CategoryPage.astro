@@ -1,0 +1,113 @@
+---
+import type { CategoryCopy, Locale, SiteCopy, ToolCopy } from "../i18n";
+import { categoryPath, localePath, toolPath } from "../i18n";
+import Base from "../layouts/Base.astro";
+import Icon from "./Icon.astro";
+import MoreTools from "./MoreTools.astro";
+
+interface Props {
+	locale: Locale;
+	site: SiteCopy;
+	tools: ToolCopy[];
+	category: CategoryCopy;
+}
+const { locale, site, tools, category } = Astro.props;
+const path = `/${category.id}/`;
+const inCategory = tools.filter((t) => t.category === category.id);
+const others = tools.filter((t) => t.category !== category.id);
+const origin = "https://tools.juluo.work";
+const icon = (slug: string) =>
+	slug === "image-to-pdf" ? "pdf" : slug === "convert-image" ? "convert" : slug === "resize-image" ? "resize" : "image";
+
+const jsonLd = [
+	{
+		"@context": "https://schema.org",
+		"@type": "CollectionPage",
+		name: category.metaTitle,
+		url: origin + localePath(locale, path),
+		description: category.metaDescription,
+	},
+	{
+		"@context": "https://schema.org",
+		"@type": "ItemList",
+		itemListElement: inCategory.map((t, i) => ({
+			"@type": "ListItem",
+			position: i + 1,
+			name: t.nav,
+			url: origin + toolPath(locale, t),
+		})),
+	},
+	{
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		mainEntity: category.faq.map((f) => ({
+			"@type": "Question",
+			name: f.q,
+			aacceptedAnswer: { "@type": "Answer", text: f.a },
+		})),
+	},
+	{
+		"@context": "https://schema.org",
+		"@type": "BreadcrumbList",
+		itemListElement: [
+			{ "@type": "ListItem", position: 1, name: site.brand, item: origin + localePath(locale, "/") },
+			{ "@type": "ListItem", position: 2, name: category.name, item: origin + localePath(locale, path) },
+		],
+	},
+];
+---
+
+<Base
+	locale={locale}
+	site={site}
+	tools={tools}
+	title={category.metaTitle}
+	description={category.metaDescription}
+	path={path}
+	jsonLd={jsonLd}
+>
+	<div class="tool-head">
+		<div class="crumbs">
+			<a href={localePath(locale, "/")}><Icon name="home" size={14} /></a>
+			<span>/</span>
+			<a href={localePath(locale, "/tools/")}>{site.navAllTools}</a>
+			<span>/</span>
+			<span>{category.name}</span>
+		</div>
+		<h1>{category.h1}</h1>
+		<p class="lead">{category.blurb}</p>
+		<span class="pill"><Icon name="lock" size={14} /> {site.footerNote}</span>
+	</div>
+
+	<section class="prose">
+		{category.intro.map((p) => <p>{p}</p>)}
+	</section>
+
+	<section>
+		<div class="section-head">
+			<h2>{category.name}</h2>
+			<span class="small muted">{inCategory.length} {locale === "en" ? "tools" : "个工具"}</span>
+		</div>
+		<div class="grid">
+			{inCategory.map((t) => (
+				<a class="card" href={toolPath(locale, t)}>
+					<div class="ico"><Icon name={icon(t.slug)} size={32} /></div>
+					<h3>{t.nav}</h3>
+					<p>{t.blurb}</p>
+					<div class="cat">{category.name}</div>
+				</a>
+			))}
+		</div>
+	</section>
+
+	<div class="ad-slot" data-ad-slot="category-mid"></div>
+
+	<section>
+		<h2>{site.faqTitle}</h2>
+		{category.faq.map((f) => (
+			<details class="faq"><summary>{f.q}</summary><p>{f.a}</p></details>
+		))}
+	</section>
+
+	<MoreTools locale={locale} tools={others} />
+</Base>

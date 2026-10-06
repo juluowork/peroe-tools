@@ -1,0 +1,8 @@
+---
+import AllToolsPage from "../components/AllToolsPage.astro";
+import { getSite, getTools } from "../i18n";
+
+const locale = "en" as const;
+---
+
+<AllToolsPage locale={locale} site={getSite(locale)} tools={getTools(locale)} />

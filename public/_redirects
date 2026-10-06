@@ -1,7 +1,14 @@
-# Cloudflare Workers 静态资源的 _redirects 规则（比 meta-refresh 更规范）
+# 旧路径 301：早期版本工具地址是扁平的，现在分类进 URL（见 README 的 URL 规则）
+/compress-image/  /image/compress-image/  301
+/convert-image/  /image/convert-image/  301
+/resize-image/  /image/resize-image/  301
+/image-to-pdf/  /pdf/image-to-pdf/  301
+
+# /en/* 别名（早期把英文版放在 /en 下）
 /en/  /  301
 /en  /  301
-/en/compress-image/  /compress-image/  301
-/en/convert-image/  /convert-image/  301
-/en/resize-image/  /resize-image/  301
-/en/image-to-pdf/  /image-to-pdf/  301
+/en/compress-image/  /image/compress-image/  301
+/en/convert-image/  /image/convert-image/  301
+/en/resize-image/  /image/resize-image/  301
+/en/image-to-pdf/  /pdf/image-to-pdf/  301
+/en/tools/  /tools/  301

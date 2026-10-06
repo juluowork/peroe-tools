@@ -1,11 +1,18 @@
-import type { APIRoute } from "astro";
-import { getTools, locales, localePath } from "../i18n";
+﻿import type { APIRoute } from "astro";
+import { activeCategories, getTools, localePath, locales } from "../i18n";
 
 const origin = "https://tools.juluo.work";
 
 export const GET: APIRoute = () => {
 	const tools = getTools("en");
-	const paths = ["/", ...tools.map((t) => `/${t.slug}/`)];
+	const categories = activeCategories("en");
+	// 逻辑路径（不含语言前缀）：首页、全部工具、分类枢纽页、工具页
+	const paths = [
+		"/",
+		"/tools/",
+		...categories.map((c) => `/${c.id}/`),
+		...tools.map((t) => `/${t.category}/${t.slug}/`),
+	];
 	const entries: string[] = [];
 	for (const p of paths) {
 		const alts = locales

@@ -1,6 +1,6 @@
 ---
 import "../styles/global.css";
-import Icon from "../components/Icon.astro";
+import ToolNav from "../components/ToolNav.astro";
 import type { Locale, SiteCopy, ToolCopy } from "../i18n";
 import { htmlLang, localePath } from "../i18n";
 
@@ -58,10 +58,7 @@ const alt = origin + localePath(locale === "en" ? "zh" : "en", path);
 				<a class="brand" href={localePath(locale, "/")}>
 					<span class="dot"></span>{site.brand}
 				</a>
-				<nav class="site-nav" aria-label={site.navLabel}>
-					{tools.map((t) => <a href={localePath(locale, `/${t.slug}/`)}>{t.nav}</a>)}
-				</nav>
-				<a class="lang-switch" href={localePath(locale === "en" ? "zh" : "en", path)}>{site.switchLabel}</a>
+				<ToolNav locale={locale} site={site} tools={tools} path={path} />
 			</div>
 		</header>
 		<main>
@@ -72,8 +69,14 @@ const alt = origin + localePath(locale === "en" ? "zh" : "en", path);
 		<footer class="site-footer">
 			<div class="wrap">
 				<span>{site.footerNote}</span>
-				<span>
+				<span class="footer-links">
+					<a href={localePath(locale, "/tools/")}>{site.navAllTools}</a>
 					{site.footerLinks.map((l) => <a href={l.href}>{l.label}</a>)}
+					<a href={`mailto:${site.email}`} title={site.contactLabel}>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" style="vertical-align:-2px;margin-right:4px">
+							<rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" />
+						</svg>{site.email}
+					</a>
 				</span>
 			</div>
 		</footer>

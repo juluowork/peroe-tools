@@ -1,0 +1,17 @@
+---
+import type { GetStaticPaths } from "astro";
+import CategoryPage from "../../components/CategoryPage.astro";
+import { activeCategories, getSite, getTools } from "../../i18n";
+import type { CategoryCopy } from "../../i18n";
+
+const locale = "en" as const;
+
+export const getStaticPaths = (() =>
+	activeCategories("en").map((category) => ({ params: { category: category.id }, props: { category } }))) satisfies GetStaticPaths;
+
+const { category } = Astro.props as { category: CategoryCopy };
+const site = getSite(locale);
+const tools = getTools(locale);
+---
+
+<CategoryPage locale={locale} site={site} tools={tools} category={category} />

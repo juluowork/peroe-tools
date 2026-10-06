@@ -55,11 +55,87 @@ export const site: SiteCopy = {
 	footerNote: "文件在你的设备上处理，不会上传。",
 	footerLinks: [{ label: "博客", href: "https://blog.peroe.cn/" }],
 	privacyLine: "没有 Cookie 追踪、没有统计像素、没有账号。",
+	navAllTools: "全部工具",
+	searchPlaceholder: "搜索工具 —— 试试「PDF」「WebP」「缩放」…",
+	searchEmpty: "没有匹配的工具，看看下面的分类吧。",
+	toolsPageTitle: "全部工具 — 免费图片 / PDF / 开发工具",
+	toolsPageDescription:
+		"peroe 工具箱的全部工具集中在这里：图片压缩与格式转换、PDF 合成，以及后续上线的开发与文本工具。全部在浏览器本地运行，不上传文件。",
+	toolsPageH1: "全部工具",
+	toolsPageLead: "所有工具都在浏览器里运行，文件不会上传。可以用搜索框，也可以直接跳到分类。",
+	relatedTitle: "同类工具",
+	contactLabel: "联系我",
+	email: "juluo@juluo.work",
+	toolCountLabel: "{n} 个工具",
+	categories: [
+		{
+			id: "image",
+			name: "图片",
+			blurb: "压缩、转换、缩放图片，全程不上传。",
+			h1: "不上传图片的在线图片工具",
+			metaTitle: "图片工具 — 压缩 / 格式转换 / 缩放，全部本地处理",
+			metaDescription:
+				"免费在线图片工具，全部在浏览器本地运行：压缩 JPG/PNG/WebP、格式互转、按像素或百分比缩放。不上传文件、无需注册。",
+			intro: [
+				"照片、截图、扫描件、设计稿，迟早都要面对同样三件事：体积更小、格式更合适、尺寸正好。这里的工具就做这三件事 —— 而且和大多数在线转换站不同，图片自始至终不会离开你的设备。",
+				"处理由浏览器里的 Canvas 与 WebAssembly 完成，所以证件扫描件、客户合同、还没发布的设计稿都留在本机。重新编码还会顺带丢掉 EXIF（包括 GPS 坐标），发布前通常正是你想要的。",
+				"实测参考：照片在 80% 画质下省 40%-70%；再转 WebP 又能省 25%-35%；把 4000px 的照片缩到实际展示的 1600px，约等于去掉六分之五的字节。",
+			],
+			faq: [
+				{
+					q: "支持哪些图片格式？",
+					a: "浏览器能解码的都可以 —— 现代浏览器上通常是 JPG、PNG、WebP、AVIF、GIF、BMP，Safari 还支持 HEIC；输出受限于浏览器能编码的格式：JPG、PNG、WebP、AVIF。",
+				},
+				{
+					q: "有大小或次数限制吗？",
+					a: "没有。没有上传、没有排队、没有账号，唯一的天花板是设备内存，一次处理几十张都没问题。",
+				},
+				{
+					q: "压缩会去掉位置信息吗？",
+					a: "会。经 Canvas 重新编码会丢掉 EXIF，包括 GPS 坐标。如果这些元数据对你有用，请保留原图。",
+				},
+			],
+		},
+		{
+			id: "pdf",
+			name: "PDF",
+			blurb: "用本机文件合成与处理 PDF，适合证件、合同、扫描件。",
+			h1: "把文档留在自己设备上的 PDF 工具",
+			metaTitle: "PDF 工具 — 图片合成 PDF，本地生成不上传",
+			metaDescription:
+				"免费在线 PDF 工具，在浏览器里把照片与扫描件合成有序 PDF：可选 A4 / Letter / 跟随图片的页面尺寸与页边距。文件不上传。",
+			intro: [
+				"需要「在哪看都一样」的时候就会用 PDF：报销要交的票据、办事要交的扫描件、给客户看的白板照片。这些文件恰恰是最不该随手上传到别人服务器上的，所以本地转换很重要。",
+				"页面直接嵌入你的原始像素，所以成品质量取决于源图 —— 需要看清文字的内容请按 200-300 DPI 扫描。「跟随图片」能避免横竖混排时的白边，A4 / Letter 则适合打印或与其它文档混排。",
+				"后面还会陆续加：多个 PDF 合并、拆分与重排页序、加水印、压缩。它们会出现在这个页面，工作方式也一样 —— 在浏览器里完成，不上传。",
+			],
+			faq: [
+				{
+					q: "拿证件、合同、发票来做安全吗？",
+					a: "安全，这正是本地处理的意义。图片与生成的 PDF 只存在于浏览器内存中，页面没有上传接口，断网也能用。",
+				},
+				{
+					q: "可以用哪些页面尺寸？",
+					a: "「跟随图片」（无白边，适合横竖混排）、A4、Letter，并可设置页边距（pt）。",
+				},
+				{
+					q: "哪些图片格式能放进去？",
+					a: "JPG 与 PNG 直接嵌入；WebP、AVIF、GIF 以及浏览器能解码的其它格式会先转成 PNG 再嵌入。",
+				},
+			],
+		},
+		{ id: "convert", name: "转换", blurb: "单位、编码、文件格式之间的相互转换。", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+		{ id: "dev", name: "开发", blurb: "写代码时的日常小工具：JSON、Base64、正则、时间戳。", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+		{ id: "text", name: "文本", blurb: "文本的清洗、统计、对比与批量替换。", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+		{ id: "web", name: "网络", blurb: "查看 URL、响应头、DNS 与证书信息。", h1: "", metaTitle: "", metaDescription: "", intro: [], faq: [] },
+	],
 };
 
 export const tools: ToolCopy[] = [
 	{
 		slug: "compress-image",
+		category: "image",
+		keywords: ["压缩", "图片压缩", "缩小体积", "无损", "jpg", "png", "webp", "照片", "compress"],
 		icon: "M4 4h16v16H4z M9 13l2.5-3 2 2.5L16 9l3 5z",
 		accent: "#2563eb",
 		nav: "图片压缩",
@@ -124,6 +200,8 @@ export const tools: ToolCopy[] = [
 	},
 	{
 		slug: "convert-image",
+		category: "image",
+		keywords: ["格式转换", "转格式", "jpg", "png", "webp", "avif", "heic", "透明", "convert"],
 		icon: "M4 7h7v10H4z M13 7h7v10h-7z M11 12h2",
 		accent: "#7c3aed",
 		nav: "格式转换",
@@ -179,6 +257,8 @@ export const tools: ToolCopy[] = [
 	},
 	{
 		slug: "resize-image",
+		category: "image",
+		keywords: ["缩放", "改尺寸", "分辨率", "宽高", "比例", "裁剪", "resize"],
 		icon: "M4 4h9v9H4z M11 11h9v9h-9z",
 		accent: "#0891b2",
 		nav: "图片缩放",
@@ -233,6 +313,8 @@ export const tools: ToolCopy[] = [
 	},
 	{
 		slug: "image-to-pdf",
+		category: "pdf",
+		keywords: ["图片转pdf", "照片转pdf", "合成pdf", "扫描件", "证件", "a4", "image to pdf"],
 		icon: "M6 3h8l4 4v14H6z M14 3v5h5",
 		accent: "#dc2626",
 		nav: "图片转 PDF",
